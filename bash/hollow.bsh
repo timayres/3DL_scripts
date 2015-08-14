@@ -1,0 +1,702 @@
+#!/bin/bash
+#hollow.bsh
+#version=unversioned
+
+# TODO: correct m_up in half bust to Y after step 1
+# TODO: add back in steps 2 & 3, adding an inset rim and a single hole
+
+#do_offset
+thickness=""
+rim_inset_test="false"
+hole_dia_test="false"
+sect_xsize=""
+simplified="false"
+
+do_hollow() {
+    # Usage: input_file [output_file]
+    #"TEMP3DP_ml_output.stl"
+    # " Function to hollow out a solid model by a desired offset (thickness)."
+    # " Also performs a plane cut, removing any geometry below z=0."
+    
+    local return_code
+
+    # openscad, try just doing a projection on imported mesh; if that doesn't work then the mesh needs to be fixed 
+
+    # make an stl version for OpenSCAD processing
+    do_2stl "$1" #this will also run do_metadata & set m_color=NC
+    do_hollow_IF_stl="$do_2stl_OF"
+  
+    # Set output file name - not currently used since we aren't scripting the entire hollowing. The final step needs to be done in blender.
+    # if [ -z "$2" ]; then # automatically name output file
+    # do_hollow_OF="${fpref}-hollow${meta}.stl" #change to ${1##*.} fext later? Or just keep as stl?
+    # else
+    # do_hollow_OF="$2"
+    # fi
+  
+    ###Ask for inputs
+    
+    grow_offset="0" # amount to offset (grow) the mesh during the pre-processing step
+    thickness="3"
+    #Ask for wall thickness
+    # thickness_test="true" # set to false to ask for value
+    # while [ "$thickness_test" = "false" ]; do
+        # echo
+        # echo "Enter the desired wall thickness of the final model as a positive number."
+        # echo -n "Hit enter to accept the default (\"3\"), e.g. 3mm thickness: "
+        # read thickness
+        # if [ -z "$thickness" ]; then
+            # thickness="3"
+            # thickness_test="true"
+        # else
+            # isnumber "$thickness"
+            # if [ $? = 0 ] ; then
+                # thickness_test="true"
+            # else
+                # echo
+                # echo "Please enter a valid number"
+            # fi
+        # fi
+    # done
+  
+    #Ask for bottom type
+    bottom_type_test="false"
+    while [ "$bottom_type_test" = "false" ]; do
+        echo ; echo "This script hollows out a solid model to a desired wall thickness."
+        echo "PLEASE ENSURE THAT MESH IS \"CLEAN\" BEFORE RUNNING."
+        echo ; echo "How would you like to hollow the solid model? Valid values are:"
+        echo "   1 - Completely remove the bottom (default)"
+        echo "   2 - Half-bust with magnet boss - NEW!"
+        echo "   3 - Bobble head - EXPERIMENTAL"        
+        
+        #echo    "Create an inset rim around the bottom (not implemented)"
+        #echo "   3 - Insert a single hole in the bottom center (not implemented)"
+        #echo "   4 - Insert 2 holes (not implemented)"
+        #echo "   5 - Half-bust with magnet boss - EXPERIMENTAL"
+        echo -n " Enter choice, or hit enter to accept the default (\"1\"): "
+        read bottom_type
+        if [ -z "$bottom_type" ]; then
+            bottom_type="1"
+        fi
+        case "$bottom_type" in
+            1 ) # open bottom
+                bottom_type_test="true"
+                bottom_open="true"
+                #do_section "0" "$do_hollow_IF_stl" "TEMP3DP_${fpref}-section.dxf" # find section for bottom extrusion
+                #bottom_section="$do_section_OF"
+                ;;
+            2 ) # half bust with magnet boss
+                bottom_type_test="true"
+                bottom_open="true"
+                ;;
+            3 ) # bobble head
+                bottom_type_test="true"
+                bottom_open="true"
+                
+                bottom_fillet_rad="1"
+                BH_angle="10" # degrees
+                ;;
+            4 ) # bottom rim
+                bottom_type_test="true"
+                bottom_open="false"
+                echo "Bottom type $bottom_type is not yet implemented"
+                exit 1
+                #do_section "0" "$do_hollow_IF_stl" "TEMP3DP_${fpref}-section.dxf" # find section for rim generation
+                #bottom_section="$do_section_OF"
+                ;;
+            5 ) # single hole
+                bottom_type_test="true"
+                bottom_open="false"
+                echo "Bottom type $bottom_type is not yet implemented"
+                # add test for hole size
+                exit 1
+                ;;
+            6 ) # two holes
+                bottom_type_test="true"
+                bottom_open="false"
+                echo "Bottom type $bottom_type is not yet implemented"
+                exit 1
+                ;;
+            * )
+                echo "$bottom_type is not a valid value"
+                ;;
+        esac
+    done
+    
+    echo
+    echo " What step do you want to start with?"
+    echo "   1 - Pre-process mesh (e.g. simplify) (MeshLab)"
+    echo "   2 - Prepare mesh for offsetting (OpenSCAD)"
+    echo "   3 - Offset mesh (MeshLab)"
+    echo "   4 - Create negative volume (OpenSCAD)"
+    echo -n " Enter choice, or hit enter to accept the default (\"1\"): "
+    read step_no
+    case "$step_no" in
+        1 | 2 | 3 | 4 )
+            ;;        
+        * )
+            step_no=1
+            ;;
+    esac
+    ###/Ask for inputs
+  
+    ###Measure mesh
+    do_measure_size "$do_hollow_IF_stl"
+    
+    orig_xmin="$xmin"
+    orig_xmax="$xmax"
+    orig_ymin="$ymin"
+    orig_ymax="$ymax"
+    orig_zmin="$zmin"
+    orig_zmax="$zmax"
+  
+    if [ $(bc <<< "$zmin > 0") -eq 1 ]; then # equals 1 if true, 0 if false
+        echo "zmin must be negative, i.e. the bottom of the mesh must be below z=0. Exiting..."
+        exit 1
+    fi
+    ###/Measure mesh
+    
+    do_h1_pre_process_OF="TEMP3DP_${fpref}_H1-pre_processed${meta}.stl"
+    do_h2_to_offset_OF="TEMP3DP_${fpref}_H2-to_offset${meta}.stl"
+    do_h3_offset_OF="TEMP3DP_${fpref}_H3-offset${meta}.stl"
+    do_h4_neg_vol_OF="${fpref}_H4-neg_vol${meta}.stl"
+    
+    ###Pre-process mesh (MeshLab)
+    if [ $step_no -eq 1 ]; then
+        do_h1_pre_process "$do_hollow_IF_stl" "$do_h1_pre_process_OF"
+        ((step_no+=1))
+    fi
+    
+    if [  ]; then # skip step 1 and use input for step 2
+        do_h1_pre_process_OF="$do_hollow_IF_stl"
+    fi
+    
+    ###Prepare mesh for offsetting (OpenSCAD)
+    if [ $step_no -eq 2 ]; then
+        do_h2_to_offset "$do_h1_pre_process_OF" "$do_h2_to_offset_OF"
+        ((step_no+=1))
+    fi
+    
+    ###Offset mesh (MeshLab)
+    if [ $step_no -eq 3 ]; then
+        do_h3_offset "$do_h2_to_offset_OF" "$do_h3_offset_OF"
+        ((step_no+=1))
+    fi
+	
+    ###Create negative volume (OpenSCAD)
+    if [ $step_no -eq 4 ]; then
+        do_h4_neg_vol "$do_h3_offset_OF" "$do_h4_neg_vol_OF"
+        ((step_no+=1))
+    fi
+  
+    echo
+    echo "Finished! If all went well you now need to take the input file \"$1\" and output file \"$do_h4_neg_vol_OF\" into Blender and add a boolean difference modifier."
+    
+    return 0
+}
+
+do_h1_pre_process() { # MeshLab
+    # Usage: input_file [output_file]
+    # TODO: input needs to be stl; for some reason the results are inverted for obj. Need to test more.
+	
+	echo ; echo "  Starting step 1 ... "
+	
+    local return_code
+    
+    do_h1_pre_process_IF="$1"
+    do_h1_pre_process_OF="$2"
+	
+    # Set other options
+    #mlx_offset_multisample="false"
+    #mlx_subdivide_Iterations="1"
+    
+    echo ; echo "Simplifying mesh: "    
+    ml_IF="$do_h1_pre_process_IF"
+    ml_OF="$do_h1_pre_process_OF"    
+    ml_SF="TEMP3DP_do_h1_pre_process.mlx"
+    
+    mlx_begin
+    mlx_simplify faces=25000
+    if [ "$bottom_type" = "2" ]; then
+        mlx_rotate x=-90 # rotate model to be on its back 
+    fi
+#	mlx_smooth 1
+#    mlx_offset voxel="$mlx_offset_CellSize" delta="$offset"
+#    mlx_subdivide "$mlx_subdivide_Iterations"
+    mlx_end
+    run_meshlab
+    return_code=$?
+    
+    do_fix_mesh "$ml_OF"    
+    do_h1_pre_process_OF="$return_file"
+    
+    return_file="$do_h1_pre_process_OF"
+    return $return_code
+}
+
+do_h2_to_offset() { # OpenSCAD
+    # assume input is stl, Z up, no texture
+    
+	echo ; echo "  Starting step 2 ... "
+    
+    local line_no
+    local return_code
+
+    do_h2_to_offset_IF="$1"
+    do_h2_to_offset_OF="$2"
+    
+    ###Measure mesh
+    #do_measure_size "$do_h2_to_offset_IF"
+    
+    #Prepare scad program
+    do_h2_to_offset_scad_OF="TEMP3DP_${fpref}_H2-to_offset${meta}.scad" # set scad file name
+    
+    
+    
+    
+    case "$bottom_type" in
+        1 | 4 | 5 | 6 ) #open & closed bottoms
+            if [ "$bottom_type" = "1" ]; then
+                # Take bottom section for extrusion
+                do_h2_Zsection_OF="TEMP3DP_${fpref}_H2-Zsection${meta}.dxf"
+
+                echo ; echo "Generating bottom section: "
+                ml_IF="$do_h1_pre_process_OF"
+                ml_OF="$do_h2_Zsection_OF"
+                ml_SF="TEMP3DP_H2_section.mlx"
+
+                mlx_begin
+                mlx_section z=0 surface=false
+                mlx_end
+                run_meshlab
+                return_code=$?
+            fi
+            
+            do_h2_to_offset_scad_IF="${scriptpath}/../scad/H2_prepare_to_offset-bust.scad"
+            
+            echo "\
+//do_h2_to_offset function
+
+//variables set via calling script
+
+bottom_open=$bottom_open;
+
+import_model_pre_processed=\"$do_h1_pre_process_OF\";
+import_model_z_section=\"$do_h2_Zsection_OF\";
+
+grow_offset=$grow_offset;
+thickness=$thickness;
+
+orig_xmin=$orig_xmin;
+orig_xmax=$orig_xmax;
+orig_ymin=$orig_ymin;
+orig_ymax=$orig_ymax;
+orig_zmin=$orig_zmin;
+orig_zmax=$orig_zmax;" > "$do_h2_to_offset_scad_OF"
+            ;;
+        2 ) #magnet
+            # Take middle section for extrusion
+            do_h2_Zsection_OF="TEMP3DP_${fpref}_H2-Zsection${meta}.dxf"
+            
+            echo ; echo "Generating middle section: "
+            ml_IF="$do_h1_pre_process_OF"
+            ml_OF="$do_h2_Zsection_OF"
+            ml_SF="TEMP3DP_H2_section.mlx"
+
+            mlx_begin
+            mlx_section z=0 surface=false
+            mlx_end
+            run_meshlab
+            return_code=$?
+            
+            # NOTE: had issues creating a surface with Ethan, so switching to dxf instead
+            
+            do_h2_to_offset_scad_IF="${scriptpath}/../scad/H2_prepare_to_offset-half_bust.scad"
+            
+            echo "\
+//do_h2_to_offset function
+
+//variables set via calling script
+
+bottom_open=$bottom_open;
+
+import_model_pre_processed=\"$do_h1_pre_process_OF\";
+import_model_z_section=\"$do_h2_Zsection_OF\";
+    
+grow_offset=$grow_offset;
+thickness=$thickness;
+
+orig_xmin=$orig_xmin;
+orig_xmax=$orig_xmax;
+orig_ymin=$orig_ymin;
+orig_ymax=$orig_ymax;
+orig_zmin=$orig_zmin;
+orig_zmax=$orig_zmax;" > "$do_h2_to_offset_scad_OF"
+            ;;
+        3 ) # bobble head
+            # Take bottom section for extrusion
+            do_h2_simp_bottom_section_OF="TEMP3DP_${fpref}_H2-simp_bottom_section${meta}.stl"
+
+            echo ; echo "Generating bottom section: "
+            ml_IF="$do_h1_pre_process_OF"
+            ml_OF="$do_h2_simp_bottom_section_OF"
+            ml_SF="TEMP3DP_H2_section.mlx"
+
+            mlx_begin
+            mlx_rotate x=-$BH_angle
+            mlx_section z=0 surface=true
+            mlx_rotate x=$BH_angle
+            mlx_end
+            run_meshlab
+            return_code=$?
+            
+            ###Measure size of cross section, we need zmax
+            do_measure_size "$do_h2_simp_bottom_section_OF" 
+            bottom_section_height="$zmax"
+            bottom_section_width="$xsize"
+        
+            do_h2_to_offset_scad_IF="${scriptpath}/../scad/H2_prepare_to_offset-BH.scad"
+            
+            echo "\
+//do_h2_to_offset function
+
+//variables set via calling script
+
+model_stl=\"$do_h1_pre_process_OF\";
+model_bottom_section_stl=\"$do_h2_simp_bottom_section_OF\";
+
+bottom_fillet_rad=$bottom_fillet_rad;
+thickness=$thickness;
+BH_angle=$BH_angle;
+bottom_section_height=$bottom_section_height;
+bottom_section_width=$bottom_section_width;
+
+orig_xmin=$orig_xmin;
+orig_xmax=$orig_xmax;
+orig_ymin=$orig_ymin;
+orig_ymax=$orig_ymax;
+orig_zmin=$orig_zmin;
+orig_zmax=$orig_zmax;" > "$do_h2_to_offset_scad_OF"
+            ;;
+        * )
+            echo "$bottom_type is not a valid value"
+            ;;
+    esac
+    
+    line_no=$(grep -n -m1 "CUT LINE" "$do_h2_to_offset_scad_IF" | cut -d":" -f1)
+    tail -n +$line_no "$do_h2_to_offset_scad_IF" >> "$do_h2_to_offset_scad_OF" #$(($line_no+1))
+    
+# #  rm -f "$do_h1_to_offset_scad_OF" #shouldn't be needed
+    # echo ; echo -n "Writing OpenSCAD program to prepare mesh for offsetting..."
+    # echo "// do_h1_to_offset function" > "$do_h1_to_offset_scad_file" # start writing scad program
+    # echo " " >> "$do_h1_to_offset_scad_file" 
+
+    # if [ "$bottom_type" != "1" ]; then # cut bottom off of mesh
+        # echo "difference() {" >> "$do_h1_to_offset_scad_file"
+        # echo "import (file=\"$do_h1_simplify_OF\", convexity=10);" >> "$do_h1_to_offset_scad_file"
+        # echo "$scad_cut_box" >> "$do_h1_to_offset_scad_file"
+        # echo "}" >> "$do_h1_to_offset_scad_file" # end difference
+    # else # extrude bottom of mesh
+    # #if [ "$bottom_type" = "1" ]; then # extrude bottom, use .01 overlap
+        # echo "union() {" >> "$do_h1_to_offset_scad_file"
+        # echo "difference() {" >> "$do_h1_to_offset_scad_file"
+        # echo "import (file=\"$do_h1_simplify_OF\", convexity=10);" >> "$do_h1_to_offset_scad_file" 
+        # echo "$scad_cut_box" >> "$do_h1_to_offset_scad_file"
+        # echo "}" >> "$do_h1_to_offset_scad_file" # end difference
+        # echo "translate ([0,0,-$bottom_extrude_trans]) linear_extrude(height = $bottom_extrude_height) {" >> "$do_h1_to_offset_scad_file"
+        # #echo "projection(cut = true) import (file=\"$do_hollow_IF_stl\", convexity=10);">> "$do_h1_to_offset_scad_file" # creates 2D outline cut at z=0
+        # echo "import (file=\"$bottom_section\");" >> "$do_h1_to_offset_scad_file" # in testing it was faster to have meshlab create the section ahead of time then for openscad to do it
+        # echo "}" >> "$do_h1_to_offset_scad_file" # end translate
+        # echo "}" >> "$do_h1_to_offset_scad_file" # end union
+    # fi
+    # echo " Done"
+    
+    
+    run_openscad "$do_h2_to_offset_scad_OF" "$do_h2_to_offset_OF" 
+    return_code=$?
+    
+    return_file="$do_h2_to_offset_OF" 
+    return $return_code
+}
+
+do_h3_offset() { # MeshLab
+    # Usage: input_file [output_file]
+    # TODO: input needs to be stl; for some reason the results are inverted for obj. Need to test more.
+	
+	echo ; echo "  Starting step 3 ... "
+    
+    grow_offset=$(bc <<< "scale=10;(0.1*$thickness)") # "0.3"
+	
+    local return_code
+    local offset
+    
+    do_h3_offset_IF="$1"
+    do_h3_offset_OF="$2"
+    
+    # 1st offset
+    
+    #mlx_offset_multisample="false"
+    #mlx_subdivide_Iterations="1"
+    
+    echo ; echo "Offsetting mesh: "    
+    ml_IF="$do_h3_offset_IF"
+    ml_OF="TEMP3DP_${fpref}_H3-offset-1st${meta}.stl"   
+    ml_SF="TEMP3DP_H3_offset-a.mlx"
+    
+    mlx_begin
+    mlx_offset voxel=1 delta="$grow_offset"
+#	mlx_smooth 1
+#    mlx_offset voxel="$mlx_offset_CellSize" delta="$offset"
+#    mlx_subdivide "$mlx_subdivide_Iterations"
+    mlx_end
+    run_meshlab
+    return_code=$?
+	
+    do_fix_mesh "$ml_OF" 
+    
+    # 2nd offset
+
+    offset=$(bc <<< "(-$thickness - $grow_offset)")
+    
+    echo ; echo "Offsetting mesh: "    
+    ml_IF="$ml_OF" # "$do_h3_offset_IF"
+    ml_OF="$do_h3_offset_OF"    
+    ml_SF="TEMP3DP_H3_offset-b.mlx"
+    
+    mlx_begin
+    mlx_offset voxel=1 delta="$offset"
+#	mlx_smooth 1
+#    mlx_subdivide "$mlx_subdivide_Iterations"
+    mlx_end
+    run_meshlab
+    return_code=$?
+	
+    do_fix_mesh "$ml_OF"
+	do_h3_offset_OF="$return_file"
+    
+    return_file="$do_h3_offset_OF"
+    return $return_code
+}
+
+do_h4_neg_vol() { # OpenSCAD
+    #TODO: add option to emboss logo to inside of model?
+	
+	echo ; echo "  Starting step 4 ... "
+    
+    local line_no
+    local return_code
+  
+    do_h4_neg_vol_IF="$1" #not needed
+    do_h4_neg_vol_OF="$2"  #not needed
+    
+    do_h4_neg_vol_scad_OF="TEMP3DP_${fpref}_H4-neg_vol${meta}.scad" # set scad file name
+    
+
+    # Determine bottom hole, ask for inputs
+    case "$bottom_type" in
+        1 ) # open bottom
+        
+            do_h4_neg_vol_scad_IF="${scriptpath}/../scad/H4_create_negative_volume-bust.scad"
+        
+            echo "\
+//do_h4_neg_vol function
+
+//variables set via calling script
+
+scad_stl_file=\"$do_h4_neg_vol_IF\";
+    
+thickness=$thickness;
+
+orig_xmin=$orig_xmin;
+orig_xmax=$orig_xmax;
+orig_ymin=$orig_ymin;
+orig_ymax=$orig_ymax;
+orig_zmin=$orig_zmin;
+orig_zmax=$orig_zmax;" > "$do_h4_neg_vol_scad_OF"
+            ;;
+        2 ) # half-bust magnet
+            
+            # Find height of magnet center - for inner hole height
+            magnet_z_pos=0.2 #magnet z position, in % up from bottom
+            magnet_z_pos=$(bc <<< "scale=10;($magnet_z_pos*$orig_zmax)")
+
+            do_measure_dimension "$do_h3_offset_OF" x=0 y=$magnet_z_pos
+            magnet_center_height="$axismax"
+
+            do_h4_neg_vol_scad_IF="${scriptpath}/../scad/H4_create_negative_volume-half_bust.scad"
+        
+            echo "\
+//do_h4_neg_vol function
+
+//variables set via calling script
+
+import_model_offset=\"$do_h4_neg_vol_IF\";
+import_model_original=\"$do_hollow_IF_stl\";
+    
+thickness=$thickness;
+magnet_z_pos=$magnet_z_pos;
+magnet_center_height=$magnet_center_height;
+
+orig_xmin=$orig_xmin;
+orig_xmax=$orig_xmax;
+orig_ymin=$orig_ymin;
+orig_ymax=$orig_ymax;
+orig_zmin=$orig_zmin;
+orig_zmax=$orig_zmax;" > "$do_h4_neg_vol_scad_OF"
+            ;;
+        3 ) # bobble head
+        
+            # Find center coordinates by offsetting bottom projection
+            echo ; echo "Finding center of opening ... "
+            do_h4_find_center_scad_OF="TEMP3DP_${fpref}_H4-find_center${meta}.scad"
+            do_h4_find_center_OF="TEMP3DP_${fpref}_H4-find_center${meta}.stl"
+            
+            echo "\
+// Inset bottom projection to find center approximation
+// Inset 90% of half of the bottom width
+bottom_section_width=$xsize;
+
+linear_extrude (height = 10) offset (delta = -0.9*bottom_section_width/2) projection() import (file=\"$do_h2_simp_bottom_section_OF\");" > "$do_h4_find_center_scad_OF"
+            
+            run_openscad "$do_h4_find_center_scad_OF" "$do_h4_find_center_OF" 
+            return_code=$?
+            do_measure_size "$do_h4_find_center_OF"
+            
+            xcenter=$(bc <<< "scale=10;($xmax + $xmin)/2") # x average
+            ycenter=$(bc <<< "scale=10;($ymax + $ymin)/2") # y average
+            
+            # Find height of offset volume at center location
+            do_measure_dimension "$do_h3_offset_OF" x=$xcenter y=$ycenter
+            center_height="$axismax"
+            
+            ###Take cross section 1 radius up for fillet, simplify
+            echo ; echo "Generating offset section for bottom fillet ... "
+            do_h4_offset_fillet_sect_OF="TEMP3DP_${fpref}_H4-offset_section${meta}.stl"
+            
+            ml_IF="$do_h1_pre_process_OF"
+            ml_OF="$do_h4_offset_fillet_sect_OF"
+            ml_SF="TEMP3DP_H4-offset_section.mlx"
+            
+            mlx_begin
+            mlx_rotate x=-$BH_angle
+            mlx_section z=$bottom_fillet_rad surface=true
+            mlx_rotate x=$BH_angle
+            mlx_simplify faces=100
+            mlx_end
+            run_meshlab
+            return_code=$?
+            
+            do_h4_neg_vol_scad_IF="${scriptpath}/../scad/H4_create_negative_volume-BH.scad"
+            
+            echo "\
+//do_h4_neg_vol function
+
+//variables set via calling script
+
+model_stl=\"$do_h1_pre_process_OF\";
+model_offset_stl=\"$do_h3_offset_OF\";
+model_bottom_section_stl=\"$do_h2_simp_bottom_section_OF\";
+model_offset_section_stl=\"$do_h4_offset_fillet_sect_OF\";
+
+bottom_fillet_rad=$bottom_fillet_rad;
+thickness=$thickness;
+BH_angle=$BH_angle;
+bottom_section_height=$bottom_section_height;
+bottom_section_width=$bottom_section_width;
+
+xcenter=$xcenter;
+ycenter=$ycenter;
+center_height=$center_height;
+
+orig_xmin=$orig_xmin;
+orig_xmax=$orig_xmax;
+orig_ymin=$orig_ymin;
+orig_ymax=$orig_ymax;
+orig_zmin=$orig_zmin;
+orig_zmax=$orig_zmax;" > "$do_h4_neg_vol_scad_OF"        
+            ;;
+        4 ) # Create an inset rim around the bottom
+            # ask for rim_inset
+            while [ "$rim_inset_test" = "false" ]; do
+                echo
+                echo "Enter the desired inset for the rim around the bottom, i.e. how much to inset the bottom perimeter. This must be a negative value. This number is added to the hollow offset value. The default is the same as the hollow offset value ($offset)."
+                echo
+                echo -n "Enter new rim inset or hit enter to accept the default (\"$offset\"): "
+                read rim_inset
+                if [ -z "$rim_inset" ]; then
+                    rim_inset="$offset"
+                    rim_inset_test="true"
+                else
+                    isnumber "$rim_inset"
+                    if [ $? -eq 0 ] ; then
+                        if [[ $rim_inset < "0" ]]; then
+                            echo
+                            echo "Rim inset must be negative"
+                        else
+                            rim_inset_test="true"
+                        fi
+                    else
+                        echo
+                        echo "Please enter a valid number"
+                    fi
+                fi
+            done
+            mesh_overlap="0.1"
+            hole_height=$(bc <<< "(-1 * $offset + 2 * $mesh_overlap)")
+            rim_inset=$(bc <<< "($offset + $rim_inset)")
+            bottom_hole="translate ([0,0,-$mesh_overlap]) linear_extrude(height = $hole_height, convexity = 10) offset(delta=$rim_inset) import (file=\"$bottom_section\");" 
+            if [ "$verbosity" -ge 6 ]; then
+                echo
+                echo hole_height="$hole_height"; echo rim_inset="$rim_inset"; echo bottom_hole="$bottom_hole"
+            fi
+            ;;
+    
+        5 ) # Insert a single hole in the bottom center
+            #max_hole_dia=
+    
+            # ask for hole diameter
+            while [ "$hole_dia_test" = "false" ]; do
+                echo
+                echo "Enter the desired inset for the rim around the bottom, i.e. how much to inset the bottom perimeter. This number is added to the hollow offset value. The default is the same as the hollow offset value ($offset)."
+                echo
+                echo -n "Enter new rim inset or hit enter to accept the default (\"$offset\"): "
+                read rim_inset
+                if [ -z "$rim_inset" ]; then
+                    rim_inset="$offset"
+                    rim_inset_test="true"
+                else
+                    isnumber "$rim_inset"
+                    if [ $? -eq 0 ] ; then
+                        rim_inset_test="true"
+                    else
+                        echo
+                        echo "Please enter a valid number"
+                    fi
+                fi
+            done
+    
+            # 3 = translate ([0,0,-0.1]) cylinder (h=3.2, d=25, $fn=100)
+            # need to check measurements to see that hole can be made
+            # need to check that model is big enough for hole! Check bottom smallest size minus 2xoffset, must be greater than diameter
+            #  //or check bottom size of offset? Checking at 3.1 works; 3.0 doesn't
+            # // can also find center of this section for hole placement!
+            ;;
+        6 ) # Insert 2 holes
+            echo "Bottom type $bottom_type is not yet implemented"
+            # add logic to get hole diameter
+            # add test for hole size
+            exit 1
+            ;;
+
+        * ) # Any other option
+            echo "$bottom_type is not a valid value"
+            ;;
+    esac
+    line_no=$(grep -n -m1 "CUT LINE" "$do_h4_neg_vol_scad_IF" | cut -d":" -f1)
+    tail -n +$line_no "$do_h4_neg_vol_scad_IF" >> "$do_h4_neg_vol_scad_OF"
+    
+    run_openscad "$do_h4_neg_vol_scad_OF" "$do_h4_neg_vol_OF" 
+    return_code=$?
+    
+    return_file="$do_h4_neg_vol_OF"
+    return $return_code
+}

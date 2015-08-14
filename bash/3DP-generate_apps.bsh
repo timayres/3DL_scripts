@@ -1,0 +1,134 @@
+#!/bin/bash
+# 3DP-generate_windows_scripts.bsh
+# generate windows & cygwin scripts
+#License: 
+
+#set -x
+
+gen_mlx_scratch_shortcuts="true"
+
+apps="
+2x3dz
+2objz
+2objNC
+check_mesh
+pricing
+simplify
+scale
+swapYZ
+2stl
+rename
+hollow
+center_x
+"
+#center_bottom
+#hollow_bobblehead
+
+scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
+
+cd "$scriptpath"
+
+for a in $apps ; do
+    #generate bash scripts for each main app
+
+    app_name="3DP-$a"
+    
+    echo "#!/bin/bash
+# Automatically generated script to launch a function
+
+main_start_time=\$(date +%s.%N)
+
+scriptpath=\"\$(cd \"\$(dirname \"\$0\")\"; pwd -P)\"
+verbosity=2
+delete_TEMP3DP_files=\"true\"
+app_name=\"$app_name\"
+
+. \${scriptpath}/3DP-main.bsh
+echo
+echo \"Starting ${app_name} on file \\\"\${fbase}\\\" ... \"
+do_$a \"\$fbase\"
+
+if [ \"\$delete_TEMP3DP_files\" = \"true\" ]; then
+    rm -f TEMP3DP_*
+fi
+
+main_end_time=\$(date +%s.%N)
+main_diff_time=\$(bc <<< \"\$main_end_time - \$main_start_time\")
+main_diff_time=\$(printf %.0f \$main_diff_time) #round to integer seconds
+
+echo 
+echo -n \"Finished ${app_name} on input file \\\"\${fbase}\\\" in \"; printf \"%0dh:%0dm:%0ds\n\" \$((\$main_diff_time/3600)) \$((\$main_diff_time%3600/60)) \$((\$main_diff_time%60))
+#TODO: add last saved filename
+echo \"Final output file: \\\"\${return_file}\\\"\"
+#each function should set their output file to return_file
+echo
+read -rsp \"Hit any key to close window ... \" -n1 key
+" > "${app_name}.bsh"
+    chmod +x "${app_name}.bsh"
+
+    if [[ $(uname -s) == CYGWIN* ]]; then
+        #generate cmd files for drag & drop on Windows
+
+        echo "@echo off
+setlocal
+set CMD_LAUNCH=true
+REM MeshLab version: 1.3.3 or 1.3.4BETA (or SVN?)
+
+set _CYGBIN=C:\\cygwin64\\bin
+if not exist \"%_CYGBIN%\" echo Couldn't find Cygwin at \"%_CYGBIN%\" & exit 3
+
+for /f \"delims=\" %%A in ('%_CYGBIN%\cygpath.exe \"%~dp0\\bash\\${app_name}.bsh\"') do set _CYGSCRIPT=%%A
+%_CYGBIN%\\bash --login \"%_CYGSCRIPT%\" %*
+endlocal
+" > "../${app_name}.cmd"
+        chmod +x "../${app_name}.cmd"   
+
+    elif [[ $(uname -s) == Linux* ]]; then
+        #generate desktop files for drag & drop on Linux
+        
+        echo "[Desktop Entry]
+Exec=\"${scriptpath}/${app_name}.bsh\"
+Name[en_EN]=${app_name}
+Terminal=true
+Type=Application
+" > "../${app_name}.desktop"
+        chmod +x "../${app_name}.desktop"    
+    fi
+done
+
+# Generate shortcuts for mlx_scratch.bsh
+if [ "$gen_mlx_scratch_shortcuts" = "true" ]; then
+    
+    app_name="mlx_scratch"
+
+    if [[ $(uname -s) == CYGWIN* ]]; then
+        #generate cmd files for drag & drop on Windows
+
+        echo "@echo off
+setlocal
+set CMD_LAUNCH=true
+
+set _CYGBIN=C:\\cygwin64\\bin
+if not exist \"%_CYGBIN%\" echo Couldn't find Cygwin at \"%_CYGBIN%\" & exit 3
+
+for /f \"delims=\" %%A in ('%_CYGBIN%\cygpath.exe \"%~dp0\\bash\\${app_name}.bsh\"') do set _CYGSCRIPT=%%A
+%_CYGBIN%\\bash --login \"%_CYGSCRIPT%\" %*
+endlocal
+" > "../${app_name}.cmd"
+        chmod +x "../${app_name}.cmd"   
+
+    elif [[ $(uname -s) == Linux* ]]; then
+        #generate desktop files for drag & drop on Linux
+        
+        echo "[Desktop Entry]
+Exec=\"${scriptpath}/${app_name}.bsh\"
+Name[en_EN]=${app_name}
+Terminal=true
+Type=Application
+" > "../${app_name}.desktop"
+        chmod +x "../${app_name}.desktop"    
+    fi
+fi
+
+
+

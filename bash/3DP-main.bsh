@@ -1,0 +1,1346 @@
+#!/bin/bash
+# 3DP-main.bsh
+version=".16devel"
+#License:
+
+# TODO: write script to generate test models 
+
+# TODO: parse ADMesh output
+
+#TODO: if mesh volume is negative, flip normals (in measure volume)
+#verbose="true" # Useful for debugging; set  to true
+#verbosity=6
+# verbosity
+#  0 = very quiet, very few messages printed
+#  1 = normal quiet level, tells you when programs are running & status
+#  2 = display output of checks (measure size, geometry & topology)
+#  3 = display ADMesh log file (do_2stl)
+#  4 = display ADMesh output (do_2stl)
+#  5 = display output of "silent" programs, i.e. MeshLab (run_meshlab)
+#  6 = display certain variables
+
+delete_TEMP3DP_files="false" # keep temp files
+
+# TODO: check filenames for spaces
+
+# NOTE: sed does not seem to work on network shares, at least in rename. Models must be on local drive. Or maybe it is just ridiculously slow.
+
+if [ "$verbosity" -ge 6 ]; then
+    echo \$0 = "$0"
+    echo \$1 = "$1"
+    echo \$@ = "$@"
+fi
+
+#########3DP Metadata##########
+# Metadata that is useful for 3D mesh models intended for 3D printing.
+# This is intended both to provide a human readable reference for some
+# useful information about the file (scale, etc.), and also
+# provides additional info that scripts can use when processing the mesh.
+# Format: metadata is listed at the end of the file name, before the
+# extension. Metadata fields are separated by periods.
+#
+# Example: mesh_name.s-10.Z.NC.S.obj
+# This states that the mesh is 1/10th scale, the Z axis, does not contain
+# any color info and mesh is solid (not hollow).
+#
+# File assumptions:
+# Model is manifold, aligned to base plane, properly oriented, and units are mm
+#
+# 3DP Metadata fields:
+# No. | Name    | Description
+#-----|---------|----------------------
+#  1   (s)cale    Scale factor based on the mesh\'s real life or original size.
+#                 Format is "#" where "#" is a positive or negative number.
+#                 Negative numbers indicate inverse scaling, e.g. "-10" means
+#                 item is scaled to 1/10th scale.
+#                 Decimals may also be used, although a comma is used as the 
+#                 decimal separator instead of a period, since periods are used
+#                 as the field separator. E.g. "0,1" is equivalent to "-10".
+#                 Default value is "1", meaning mesh is actual size.
+#  2   Up Axis    Which axis is "up"; possible values are Y or Z. Some software
+#                 (e.g. Meshlab, MeshMixer, Blender, Shapeways) assumes that Y
+#                 is up. Many 3D printing programs (e.g. OpenSCAD, Slic3r)
+#                 assumes that Z is up.
+#                 Note that this needs to be considered with fields #3 & #4
+#                 to determine the "height" of the mesh model.
+#  3   Color      Does the mesh contain color info, e.g. an associated texture?
+#                 Possible values are "UV" (for a UV mapped texture) or "NC"
+#                 (for No Color). "VC" (vertex color) may be added in the
+#                 future if there is interest and a need. 
+#  4   (S)olid    Is the mesh hollow, i.e. modelled as a shell with exit holes?
+#   or (H)ollow   Hollowing out meshs can save significant costs when printing,
+#                 especially when using 3DP services.
+#########3DP Metadata##########
+
+##########Dependencies##########
+### 3D
+# MeshLab http://meshlab.sourceforge.net/ version 1.34BETA
+#   License: GPLv2
+# ADMesh https://github.com/admesh/admesh version 0.98.2
+#   License: GPLv2
+# OpenSCAD http://www.openscad.org/ version 2015.03
+#   License: GPLv2
+# Likely to be included in the future:
+# blender
+# slic3r and/or cura
+#
+### 2D
+# imagemagick http://www.imagemagick.org/ Used to pre-process images - TODO: switch to graphicsmagick
+# potrace & mkbitmap  http://potrace.sourceforge.net/ Used to trace bitmaps
+# autotrace http://autotrace.sourceforge.net/ Alternative bitmap tracing program
+# inkscape https://inkscape.org/ Used to convert svg to eps
+# pstoedit http://www.pstoedit.net/ Used to convert eps to dxf
+#
+### Bash shell, provided by Cygwin on Windows
+# supporting command line programs, such as bc, zip, etc.
+
+##########Check environment##########
+if [[ $(uname -s) == CYGWIN* ]]; then
+  # Installation:
+  #   manually install cygwin 
+  #   install apt-cyg https://github.com/transcode-open/apt-cyg via:
+  #     lynx -source rawgit.com/transcode-open/apt-cyg/master/apt-cyg > apt-cyg
+  #     install apt-cyg /bin
+  #   apt-cyg install wget
+  #   apt-cyg install bc pstoedit potrace poppler autotrace zip
+  # manually install inkscape, openscad, meshlab, admesh
+  # can download & launch installers
+  # package admesh, maybe in sub directory, or in cygwin
+	
+    ML_VERSION="1.3.4BETA" # MeshLab version, 1.3.3 or 1.3.4BETA or SVN
+    
+	# Set paths for dependencies
+	MESHLAB_PATH="/cygdrive/c/Program Files/VCG/MeshLab"
+	OPENSCAD_PATH="/cygdrive/c/Program Files/OpenSCAD"
+	ADMESH_PATH="/cygdrive/c/Program Files/admesh"
+	INKSCAPE_PATH="/cygdrive/c/Program Files/Inkscape"
+    
+	alias openscad="openscad.com"
+	alias inkscape="inkscape.com"
+	
+  #to copy & paste into cygwin session for interactive use
+  # PATH="/cygdrive/c/Program Files/VCG/MeshLab":"/cygdrive/c/Program Files/OpenSCAD":"/cygdrive/c/Program Files/Inkscape":"/cygdrive/c/Program Files/admesh":$PATH 
+	PATH=$MESHLAB_PATH:$OPENSCAD_PATH:$ADMESH_PATH:$INKSCAPE_PATH:$PATH
+
+#elif [ "$(uname)" == "Darwin" ]; then
+    # Do something under Mac OS X platform
+elif [[ $(uname -s) == Linux* ]]; then
+    # Do something under Linux platform
+    ML_VERSION="1.3.3" # MeshLab version, 1.3.3 or 1.3.4BETA or SVN
+fi
+
+# Correct working directory & paths if script was launched from __.cmd file
+if [ "$CMD_LAUNCH" = "true" ]; then
+    nixpath="$(cygpath -u "$1")" #convert Windows path to cygwin path
+else
+    nixpath="$1"
+fi
+
+### Begin Find file paths
+scriptpath="$(cd "$(dirname "$0")"; pwd -P)" # path of this script file, in bash directory
+#reference this as ${scriptpath%/*} to get parent directory
+fpath="${nixpath%/*}" # input file path
+cd "$fpath" # make the directory containing the input file the current directory
+fbase="${nixpath##*/}" # file basename (prefix+extension)
+fext="${fbase##*.}" # file extension, not currently used in script
+fpref_full="${fbase%.*}" # full file prefix, including metadata
+fpref=$(echo "$fpref_full" | cut -d"." -f1) # file prefix without metadata
+
+if [ "$verbosity" -ge 6 ]; then
+    echo ; echo scriptpath = "$scriptpath"; echo nixpath="$nixpath"; echo fpath="$fpath"; echo fbase="$fbase"; echo fpref_full="$fpref_full"; echo fext="$fext"; echo ML_VERSION="$ML_VERSION"
+fi
+### End Find file paths
+
+###Remove temp files
+if [ "$delete_TEMP3DP_files" = "true" ]; then
+	rm -f TEMP3DP_* # Delete all files with temp file prefix
+fi
+
+#########Functions##########
+
+##Include sub scripts
+. ${scriptpath}/utilities.bsh
+. ${scriptpath}/mlx.bsh
+. ${scriptpath}/measure.bsh
+. ${scriptpath}/hollow.bsh
+
+delete_originals() {
+    # function to delete a file and its secondary, e.g. mtl file
+    # textures are NOT deleted, since they can be used by multiple files
+
+    case "${1##*.}" in # check file extension
+        [Oo][Bb][Jj] )
+            if [ "$m_color" = UV ]; then
+                do_subfiles "$1"
+                if [ -e "$material_file" ]; then
+                    rm -f "$material_file" # delete original material file
+                fi
+            fi
+            ;;
+    esac
+    rm -f "$1"
+    return 0
+}
+
+
+do_metadata () {
+    # Function to check metadata and correct if needed
+
+    parse_metadata "$1"
+
+    if [ "$verbosity" -ge 6 ]; then
+        echo
+        echo "Metadata values at start of do_metadata:"
+        echo fpref_full="$fpref_full"
+        echo fpref="$fpref"
+        echo m_scale="$m_scale"
+        echo m_up="$m_up"
+        echo m_color="$m_color"
+        #echo m_solid="$m_solid"
+    fi
+
+    ###### Check metadata #####
+    
+    ##Note: this is here instead of in do_rename since fpref is reset at the 
+    #+ start of do_metadata
+    ###Rename fpref
+    if [ "$rename_fpref" = "true" ]; then
+        echo
+        echo "Enter the subject of the mesh, using a descriptive base name for the mesh, such as \"Subject_Bust\""
+        echo "NO SPACES OR PERIODS. Use an underscore \"_\" or dashes \"-\" to separate words."
+        echo -n "Enter the new base name or hit enter to keep the current name \"${fpref}\": "
+        read fpref_input
+        if [ -n "$fpref_input" ]; then #-n is true if string is non-zero
+            fpref="${fpref_input}"
+        fi
+    fi
+    ###/Rename fpref
+    
+    ###Check m_scale
+    #m_scale=$(echo $m_scale | cut -c 2-) # cut leading "s"
+    #m_scale=${m_scale/,/.} #replace comma with period
+    case "${1##*.}" in # check file extension of input
+        [Ss][Tt][Ll] ) # assuming these are files from thingiverse, etc. at original scale
+            m_scale_default="1"
+            ;;
+        * )
+            m_scale_default="-10"
+            ;;
+    esac
+    m_scale_test="false"
+    while [ "$m_scale_test" = "false" ]; do
+        isnumber "$m_scale"
+        if [ $? -eq 0 ] ; then
+            if [ "$scale" = "0" ]; then
+                echo
+                echo "Scale can\'t be zero!"
+            else
+                m_scale_test="true"
+            fi
+        else
+            echo
+            echo "Scale factor is not a valid number"
+        fi
+        if [ "$m_scale_test" = "false" ]; then
+            echo
+            echo "Enter the current scale of the mesh."
+            echo "Acceptable formats:"
+            echo "  * Positive value greater than one,"
+            echo "    e.g. \"2\" means the mesh is twice its original size."
+            echo "  * Negative value for an inverse scale factor, (e.g. \"-10\" means 1/10th scale)"
+            echo "  * Decimal value with period separator, (e.g. \"0.1\" for 1/10th scale)"
+            echo -n "Hit enter to accept the default (\"$m_scale_default\"): "
+            read m_scale
+            if [ -z "$m_scale" ]; then
+                m_scale="$m_scale_default"
+            fi
+        fi
+    done
+    #m_scale=${m_scale/./,} #replace period with comma
+    ###/Check m_scale
+  
+    ### Check m_up
+    ## Y or Z
+    case "${1##*.}" in # check file extension of input
+        [Ss][Tt][Ll] )
+            m_up_default="Z"
+            ;;
+        * )
+            m_up_default="Y"
+        ;;
+    esac
+    m_up_test="false"
+    while [ "$m_up_test" = "false" ]; do
+        case "$m_up" in
+            [yY] )
+                m_up="Y"
+                m_up_test="true"
+                ;;
+            [zZ] )
+                m_up="Z"
+                m_up_test="true"
+                ;;
+            * )
+                echo
+                echo "Enter the mesh \"up\" axis. Valid values are Y or Z."
+                echo -n "Hit enter to accept the default (\"$m_up_default\"): "
+                read m_up
+                if [ -z "$m_up" ]; then
+                    m_up="$m_up_default"
+                fi
+                ;;
+        esac
+    done
+    ### End check m_up
+
+    set_m_color "$1"
+  
+    ### Check m_solid
+    ## S or H
+    m_solid_test="true"
+    while [ "$m_solid_test" = "false" ]; do
+        case "$m_solid" in
+            S )
+                m_solid_test="true"
+                ;;
+            H )
+                m_solid_test="true"
+                ;;
+            * )
+                echo
+                echo "Is the mesh solid (S) or hollow (H)?"
+                echo -n "Hit enter to accept the default (\"S\"): "
+                read m_solid
+                if [ -z "$m_solid" ]; then
+                    m_solid="S"
+                fi
+                ;;
+        esac
+    done
+    ### End check m_solid
+    
+    set_meta
+  
+    if [ "$verbosity" -ge 6 ]; then
+        echo
+        echo "Metadata values at end of do_metadata:"
+        echo m_scale = "$m_scale"
+        echo m_up = "$m_up"
+        echo m_color = "$m_color"
+        #echo m_solid = "$m_solid"
+        echo meta = "$meta"
+    fi
+    return 0
+}
+
+parse_metadata () {
+    fpref_full="${1%.*}" # full file prefix, including metadata
+    
+    metadata=$(echo "$fpref_full" | awk -F '[)(]' '{print $(NF-1)}') # prints last field enclosed in parentheses (second to last field matched)
+    
+    if [ "$fpref_full" = "$metadata" ]; then
+        fpref=$(echo "$fpref_full" | cut -d"." -f1) # file prefix without metadata
+        #fpref=$(echo "${1%.*}" | cut -d"." -f1) # file prefix without metadata
+        m_scale=$(echo "$fpref_full" | cut -d"." -f2)
+        m_up=$(echo "$fpref_full" | cut -d"." -f3)
+        #m_color=$(echo "$fpref_full" | cut -d"." -f4)
+        #m_solid=$(echo "$fpref_full" | cut -d"." -f5)
+    else
+        m_scale=${metadata:: -1} # strip last character
+        #cut last character echo ${foo%?}
+        m_up=${metadata: -1} # return only last character
+        #fpref=$(echo "$fpref_full" | awk -F '[)(]' '{$NF=$(NF-1)=""; print $0}')
+        #fpref="${fpref// /}" # strip all whitespace, including any interior spaces
+        #fpref=$(trim "$fpref")
+        fpref="${fpref_full%(*}" #cut out everything beyong last "("
+    fi
+}
+
+set_m_color () {
+    ## UV or NC
+    ## This checks the subfiles to see if there is an associated texture file.
+    ## Vertex colors could be added in the future
+    do_subfiles "$1"
+    if [ ${#texture_files_unique[@]} -ne 0 ]; then
+        m_color="UV"
+    else
+        m_color="NC"
+    fi
+}
+
+set_meta() {
+    # meta=".${m_scale}.${m_up}.${m_color}.${m_solid}"
+    meta="(${m_scale}${m_up})"
+}
+
+do_subfiles () {
+    # Function to find associated subfiles, e.g. material & texture files.
+    # Add additional file type support in the future, e.g. ply
+
+    case "${1##*.}" in # check file extension of input
+        [Oo][Bb][Jj] )
+            # Format: mtllib ./model_mesh.obj.mtl
+            material_file=$(grep "mtllib" "$1" 2> /dev/null | cut -d" " -f2)
+            material_file="${material_file##*/}" # strip out path
+    
+            if [ -n "$material_file" ]; then
+                # Format: map_Kd model_texture.jpg
+                # texture_files: array of texture image files
+                OIFS="$IFS"; IFS=$'\n'; texture_files=( $(grep "map_Kd" "$material_file" | cut -d" " -f2) ); IFS="$OIFS"
+                OIFS="$IFS"; IFS=$'\n'; texture_files_unique=( $(sort -u <<< "${texture_files[*]}") ); IFS="$OIFS"
+            fi
+    
+            if [ "$verbosity" -ge 2 ]; then
+                echo
+                echo "Material file: ""$material_file"
+                echo "Number of texture file(s): " ${#texture_files[@]}
+                echo "Number of unique texture file(s): " ${#texture_files_unique[@]}
+                echo "Texture file(s): " ${texture_files[@]}
+                echo "Unique Texture file(s): " ${texture_files_unique[@]}
+            fi
+            ;;
+        [Ss][Tt][Ll] )
+            texture_files=()
+            ;;
+        [Xx]3[Dd] )
+            # Format: <ImageTexture url="model_texture.jpg"/>
+            OIFS="$IFS"; IFS=$'\n'; texture_files=( $(grep "ImageTexture" "$1" | cut -d"\"" -f2) ); IFS="$OIFS"
+            OIFS="$IFS"; IFS=$'\n'; texture_files_unique=( $(sort -u <<< "${texture_files[*]}") ); IFS="$OIFS"
+            if [ "$verbosity" -ge 2 ]; then
+                echo
+                echo "Number of texture file(s): " ${#texture_files[@]}
+                echo "Number of unique texture file(s): " ${#texture_files_unique[@]}
+                echo "Texture file(s): " ${texture_files[@]}
+                echo "Unique Texture file(s): " ${texture_files_unique[@]}
+            fi
+            ;;
+        * )
+            echo "${1##*.} is not currently supported"
+            texture_files=()
+            return 1
+        ;;
+    esac
+    
+    if [ ${#texture_files[@]} -gt 1 ]; then
+        echo ; echo "WARNING: model has ${#texture_files_unique[@]} unique texture files and ${#texture_files[@]} total texture files!"
+    fi
+    
+    return 0
+}
+
+
+do_fix_mesh() {
+    ##Function to automatically fix mesh, particularly after resampling
+    
+    local line_no
+    local return_code
+    
+    cp "$1" "${1%(*}-original${meta}.stl"
+    
+    echo ; echo "Checking mesh topology ... "
+    ml_IF="$1"
+    ml_OF=""
+    ml_LF="TEMP3DP_ML_log_fix_mesh0.txt"
+    ml_SF="TEMP3DP_fix_mesh0.mlx"
+    
+    mlx_begin
+    mlx_measure_topology
+    mlx_end
+    
+    run_meshlab
+    return_code=$?
+    parse_topology_log "$ml_LF"
+ #   parse_geometry_log "$ml_LF"
+    
+    ml_OF="$1"
+    mesh_fixed="false"
+    dsc="false"
+    while [ "$mesh_fixed" = "false" ]; do
+        if [ $num_parts -gt 1 ] && [ "$dsc" = "false" ]; then
+            echo ; echo "Deleting small components ... "
+            ml_IF="$ml_OF"
+            ml_OF="$ml_OF"
+            ml_LF="TEMP3DP_ML_log_fix_mesh1-dsc.txt"
+            ml_SF="TEMP3DP_fix_mesh1-dsc.mlx"
+            
+            mlx_begin
+            mlx_del_small_components
+            mlx_measure_topology
+            mlx_end
+            
+            run_meshlab
+            return_code=$?
+            parse_topology_log "$ml_LF"
+            dsc="true"
+        fi
+        
+        # try to fix non-manifold issues without creating holes
+        if [ $non_manifold_E -ne 0 ] || [ $non_manifold_V -ne 0 ]; then
+            echo ; echo "Deleting faces from non-manifold edges ... "
+            echo ; echo "Splitting non-manifold vertices till it becomes two-manifold ... "
+            ml_IF="$ml_OF"
+            ml_OF="$ml_OF"
+            ml_LF="TEMP3DP_ML_log_fix_mesh2-nonmanifold.txt"
+            ml_SF="TEMP3DP_fix_mesh2-nonmanifold.mlx"
+            
+            mlx_begin
+            mlx_del_F_from_nonmanifold_E
+            mlx_split_V_on_nonmanifold_F
+            mlx_measure_topology
+            mlx_end
+            
+            run_meshlab
+            return_code=$?
+            parse_topology_log "$ml_LF"
+        fi
+        
+        if [  ]; then
+            echo ; echo "Splitting non-manifold vertices till it becomes two-manifold ... "
+            ml_IF="$ml_OF"
+            ml_OF="$ml_OF"
+            ml_LF="TEMP3DP_ML_log_fix_mesh3-nonmV.txt"
+            ml_SF="TEMP3DP_fix_mesh3-nonmV.mlx"
+            
+            mlx_begin
+            mlx_split_V_on_nonmanifold_F
+            mlx_measure_topology
+            mlx_end
+            
+            run_meshlab
+            return_code=$?
+            parse_topology_log "$ml_LF"
+        fi
+        
+        isnumber "$num_holes"
+        if [ $? -eq 0 ] ; then
+            if [ $num_holes -gt 0 ]; then
+                echo ; echo "Growing then filling holes ... "
+                ml_IF="$ml_OF"
+                ml_OF="$ml_OF"
+                ml_LF="TEMP3DP_ML_log_fix_mesh3-holes.txt"
+                ml_SF="TEMP3DP_fix_mesh3-holes.mlx"
+                
+                mlx_begin
+                #mlx_grow_holes
+                mlx_close_holes 50
+                mlx_measure_topology
+                mlx_end
+                
+                run_meshlab
+                return_code=$?
+                parse_topology_log "$ml_LF"
+            fi
+        fi
+        
+        do_2stl "$ml_OF" "$ml_OF"
+        echo ; echo "Checking mesh topology after ADMesh ... "
+        ml_IF="$ml_OF"
+        ml_OF="$ml_OF"
+        ml_LF="TEMP3DP_ML_log_fix_mesh4-admesh.txt"
+        ml_SF="TEMP3DP_fix_mesh4-admesh.mlx"
+        
+        mlx_begin
+        mlx_measure_topology
+        mlx_end
+        
+        run_meshlab
+        return_code=$?
+        parse_topology_log "$ml_LF"
+        
+        # if we still have non-manifold issues then fix via deletion & filling resultant holes
+        if [ $non_manifold_E -ne 0 ] || [ $non_manifold_V -ne 0 ]; then
+            echo ; echo "Deleting non-manifold edges & vertices & filling holes ... "
+            ml_IF="$ml_OF"
+            ml_OF="$ml_OF"
+            ml_LF="TEMP3DP_ML_log_fix_mesh5-nonmanifold.txt"
+            ml_SF="TEMP3DP_fix_mesh5-nonmanifold.mlx"
+            
+            mlx_begin
+            mlx_del_nonmanifold_E
+            mlx_del_nonmanifold_V
+            mlx_del_unreferenced_V
+            mlx_close_holes 50
+            mlx_measure_topology
+            mlx_end
+            
+            run_meshlab
+            return_code=$?
+            parse_topology_log "$ml_LF"
+        fi
+        
+        do_2stl "$ml_OF" "$ml_OF"
+        echo ; echo "Checking mesh topology after ADMesh ... "
+        ml_IF="$ml_OF"
+        ml_OF="$ml_OF"
+        ml_LF="TEMP3DP_ML_log_fix_mesh4-admesh.txt"
+        ml_SF="TEMP3DP_fix_mesh4-admesh.mlx"
+        
+        mlx_begin
+        mlx_measure_topology
+        mlx_end
+        
+        run_meshlab
+        return_code=$?
+        parse_topology_log "$ml_LF"
+        
+        if [ "$manifold" = "2-manifold" ] && [ "$num_holes" = "0" ]; then
+            echo ; echo "  Mesh is composed of $num_parts component(s) and looks \"clean\" (2-manifold and no holes). Continuing on ..."
+            mesh_fixed="true"
+        else
+            echo -n "  Mesh has some issues that need to be fixed. Enter \"r\" to re-run mesh fixing script or fix externally and hit \"enter\" when you're ready to continue ... "
+            read rerun
+            if [ -z "$rerun" ]; then mesh_fixed="true"; fi
+        fi
+    done
+    
+    # delete small components
+    # delete bad vertices
+    # close holes (MeshLab)
+    # ADMesh (closes holes & additional cleaning - stl only)
+    
+    ml_LF=""
+    return_file="$ml_OF"
+    return $return_code
+}
+
+do_check_mesh() {
+    ##Function to check mesh by running "Compute Topological Measures" in ML
+    ##TODO: add additional options to try to fix any issues found
+    
+    local line_no
+    local return_code
+    
+    do_measure_all "$1"
+    
+    
+    # delete small components
+    # delete bad vertices
+    # close holes (MeshLab)
+    # ADMesh (closes holes & additional cleaning - stl only)
+    
+    ml_LF=""
+    return_file="$1"
+    return $return_code
+}
+
+# Need to add capability to accept multiple input files first?
+# function to use openscad to perform a boolean union on multiple input files
+do_union() {
+    echo ; echo "Performing a boolean union on the following meshes: "
+    printf "    %s\n" "$@"
+    
+    do_union_scad_OF="TEMP3DP_${fpref}_union${meta}.scad"
+    do_union_OF="${fpref}_union${meta}.stl"
+    
+    echo "\
+union() {" > "$do_union_scad_OF"
+for i in "$@"; do
+    echo "\
+import (file=\"$i\");" >> "$do_union_scad_OF"
+done
+    echo "\
+}" >> "$do_union_scad_OF"
+           
+    run_openscad "$do_union_scad_OF" "$do_union_OF" 
+    return_code=$?
+    
+    
+    #echo -n "Drop a file here, what happens?"
+    #read file
+    #echo "$file"
+    # Answer: on Windows it copies the entire file path to the terminal, but does not press enter
+}
+
+do_simplify() {
+    local return_code
+    local faces
+    
+    if [ -z "$m_color" ]; then  
+        do_metadata "$1" # set m_scale
+    fi
+    
+    do_measure_all "$1"
+    
+    avg_face_area=$(bc <<< "scale=10;($area_mm2/$num_F)")
+    
+    echo 
+    echo "  Faces: $num_F" 
+    #echo "  Surface Area (mm^2): "$(printf %.2f "$area_mm2") #"$area_mm2"
+    echo "  Surface Area (cm^2): "$(printf %.2f "$area_cm2") #"$area_cm2"
+    echo "  Average Face Area (mm^2): "$(printf %.4f "$avg_face_area")
+    echo ;
+    echo "  Enter the target number of faces or hit enter to"
+    echo -n "accept the default (\"25000\"): "
+    read faces
+    if [ -z "$faces" ]; then
+        faces="25000"
+    fi
+    
+    # Set output file name
+    if [ -z "$2" ]; then
+        do_simplify_OF="${fpref}-simp$(($faces/1000))K${meta}.${1##*.}"
+    else
+        do_simplify_OF="$2"
+    fi
+    
+    echo ; echo "Simplifying mesh ... "
+    ml_IF="$1"
+    ml_OF="$do_simplify_OF"    
+    ml_SF="TEMP3DP_simplify.mlx"
+    
+    mlx_begin
+    mlx_simplify faces=$faces
+    mlx_end
+    run_meshlab
+    return_code=$?
+    
+    return_file="$do_simplify_OF" 
+    return $return_code
+}
+
+do_pricing  () {
+    echo
+    echo "Pricing: this function calculates the price for full color stone material from various 3D printing services."
+    
+    local return_code
+    
+    #echo
+    #echo "Running measure function to find mesh volume..."
+    old_verbosity="$verbosity"
+    verbosity=2
+    do_measure_all "$1" # find size and volume_cm3
+    return_code=$?
+    verbosity="$old_verbosity"
+    
+    ###Calculate Pricing for Full Color/Multicolor Material###
+    # Shapeways pricing: $3+$0.75/cm3
+    shapeways=$(bc <<< "(3 + 0.75 * $volume_cm3)")
+    echo
+    echo Shapeways price for full color material: \$$(printf %.2f "$shapeways")
+
+    # i.Materialize pricing: 8EUR+0.55EUR/cm3
+    # Find current EUR to USD exchange rate
+
+    i_materialize=$(bc <<< "scale=2;(8 + 0.55 * $volume_cm3)") # in EUR
+    i_materialize=$(cconv $i_materialize eur usd) # convert to USD
+    echo
+    echo i.Materialize price for full color material: \$$(printf %.2f "$i_materialize")
+
+    # Sculpteo: they do not publish their pricing formula
+    # need to run some tests to determine formula
+
+    return $return_code
+}
+
+do_scale () {
+    #echo
+    #echo "Scale: this function scales the mesh using MeshLab"
+  
+    local return_code
+    
+    if [ -z "$m_scale" ]; then  
+        do_metadata "$1" # set m_scale
+    fi
+  
+    #m_scale=${m_scale/,/.} #replace comma with period
+  
+    # echo
+    # echo "      Size table for common scale factors"
+    # echo "   Scale  | Full Length (FL) |   Busts (B)"
+    # echo "   Factor |     6\' (1.8m)    | 18\" (450mm)"
+    # echo " ---------|------------------|----------------"
+    # echo "     1/3  |                  | 6.0\" (150.0mm)"
+    # echo "     1/4  |                  | 4.5\" (112.5mm)"
+    # echo "     1/6  | 12.0\" (300.0mm)  | 3.0\" (75.0mm)"
+    # echo "     1/8  | 9.0\" (225.0mm)   | 2.3\" (56.3mm)"
+    # echo "     1/10 | 7.2\" (180.0mm)   | 1.8\" (45.0mm)"
+    # echo "     1/12 | 6.0\" (150.0mm)"
+    # echo "     1/14 | 5.1\" (128.6mm)"
+    # echo "     1/16 | 4.5\" (112.5mm)"
+    # echo "     1/18 | 4.0\" (100.0mm)"
+    # echo "Scale factor to convert inches to mm: 25.4"
+    # echo "(Note: if you scale the mesh to convert between units then you will need to manually correct the file metadata scale factor afterwards.)"
+  
+    echo
+    echo "      Size Table for Common Scale Factors"
+    echo "   Scale  |   Busts (B)    | Full Length (FL) |"
+    echo "   Factor |  18\" (450mm)   |     6' (1.8m)    |"
+    echo " ---------|----------------|------------------|"
+    echo " XXL 1/3  | 6.0\" (150.0mm) |                  |"
+    echo " XL  1/4  | 4.5\" (112.5mm) |                  |"
+    echo " L   1/5  | 3.6\"  (90.0mm) | 14.4\" (360.0mm)  |"
+    echo " M   1/6  | 3.0\"  (75.0mm) | 12.0\" (300.0mm)  |"
+    echo " S   1/8  | 2.3\"  (56.3mm) | 9.0\" (225.0mm)   |"
+    echo " XS  1/10 | 1.8\"  (45.0mm) | 7.2\" (180.0mm)   |"
+    echo "     1/12 |                | 6.0\" (150.0mm)   |"
+
+    # Convert m_scale to current scale value
+    if [ $(bc <<< "($m_scale < 0)") -eq 1 ]; then # bc returns 1 if true
+        scale_cur=$(bc <<< "(-1 * $m_scale)")
+        echo
+        echo "Current scale is 1/$scale_cur"
+        scale_cur=$(bc <<< "scale=10;(1 / $scale_cur)") #must use scale with division, otherwise it rounds to whole number
+    else
+        scale_cur="$m_scale"
+        echo
+        echo "  Current scale is $scale_cur"
+    fi
+
+    echo
+    echo "New scale factor: note that mesh will be scaled against its original"
+    echo "size, not the current scale factor."
+    echo "  Acceptable inputs:"
+    echo "   - To scale something up (larger), enter a positive value greater"
+    echo "     than 1, e.g. \"2\" to scale twice as big."
+    echo "   - To scale something down (smaller), enter a negative value for"
+    echo "     an inverse scale (e.g. \"-10\" for 1/10th scale) or enter a"
+    echo "     decimal (e.g. \"0.1\")."
+  
+    #TODO: test with various options, such as negative decimal
+    m_scale_test="false"
+    while [ "$m_scale_test" = "false" ]; do
+        echo -n "New scale factor: "
+        read m_scale
+        isnumber "$m_scale"
+        if [ $? -eq 0 ] ; then
+            if [ "$m_scale" = "0" ]; then
+                echo
+                echo "Scale can\'t be zero!"
+            else 
+                m_scale_test="true"
+            fi
+        else
+            echo
+            echo "Please enter a valid number"
+        fi
+    done
+  
+    if [ "$verbosity" -ge 6 ]; then
+        echo new m_scale = "$m_scale"
+    fi
+    
+    if [ $(bc <<< "($m_scale < 0)") -eq 1 ]; then # bc returns 1 if true
+        scale=$(bc <<< "scale=10;(-1 / $m_scale)") #must use scale with division, otherwise it rounds to whole number
+    else
+        scale="$m_scale"
+    fi
+  
+    scale=$(bc <<< "scale=10;($scale / $scale_cur)") # adjust scale factor for current scale 
+  
+    # Prepare output options
+    #m_scale=${m_scale/./,} #replace period with comma
+    set_meta
+    do_scale_OF="${fpref}${meta}.${1##*.}"
+    
+    echo ; echo "Scaling mesh: "
+    ml_IF="$1"
+    ml_OF="$do_scale_OF"
+    ml_SF="TEMP3DP_scale.mlx"
+
+    mlx_begin
+    mlx_scale scale="$scale"
+    mlx_end
+    run_meshlab
+    return_code=$?
+    
+    return_file="$do_scale_OF"
+    return $return_code
+}
+
+do_swapYZ () {
+    # Usage: input_file output_file
+    # if output_file is blank then the output file name will be automatically set based on the input file name & metadata
+    # and the original file will be deleted.
+    # "swapYZ: function to swap Y & Z axis, e.g. the \"up\" axis. This rotates the model by 90 degrees about the X axis."
+    
+    local return_code
+    local angle
+  
+    if [ -z "$m_up" ]; then
+        do_metadata "$1" # set m_up
+    fi
+
+    if [ "$m_up" = "Y" ]; then # YtoZ: rotate x=90
+        m_up="Z"
+        angle="90"
+    else # ZtoY: rotate x=-90
+        m_up="Y"
+        angle="-90"
+    fi  
+    set_meta
+    
+    # Set output file name
+    if [ -z "$2" ]; then
+        do_swapYZ_OF="${fpref}${meta}.${1##*.}"
+    else
+        do_swapYZ_OF="$2"
+    fi
+    
+    echo ; echo "Rotating mesh ... "
+    ml_IF="$1"
+    ml_OF="$do_swapYZ_OF"    
+    ml_SF="TEMP3DP_rotate.mlx"
+    
+    mlx_begin
+    mlx_rotate x="$angle"
+    mlx_end
+    run_meshlab
+    return_code=$?
+    
+    if [ -z "$2" ]; then # delete original files
+        if [ -e "$ml_OF" ]; then
+            echo
+    #      delete_originals "$ml_IF"
+    # TODO: instead of deleting originals, can set ml_IF & ml_OF to be the same to overwrite.
+        fi
+    fi
+    
+    return_file="$do_swapYZ_OF" 
+    return $return_code
+}
+
+do_rename () {
+    # "Rename: function to rename file (and associated material & texture files) & set metadata."
+    
+    local return_code
+    local i
+    
+    if [ "$fpref_full" = "model_mesh" ]; then
+        m_scale="-10"
+        m_up="Y"
+        m_color="UV"
+        #m_solid="S"
+        set_meta
+        
+        #add _B to end of name for bust, just ask for base name
+        echo "Enter the subject of the mesh, using an underscore \"_\" in place of a space,"
+        echo "for example \"Tim\" or \"Tim_&_Bridget\". This is the name that will be imprinted on the object."
+        read mesh_name
+        fpref="$mesh_name"
+        echo -n "Is this a bust? \"Enter\" for yes or \"n\" for no: "
+        read bust
+        if [ -z "$bust" ]; then #-z is true if string is zero
+            fpref="${fpref}-bust-v0"
+        else
+            fpref="${fpref}-v0"
+        fi
+        do_subfiles "$1"
+    else
+        rename_fpref="true"
+        do_metadata "$1" # this will also run do_subfiles
+    fi
+
+    do_rename_OF="${fpref}${meta}.${1##*.}"
+    #set -x
+    if [ "$1" != "$do_rename_OF" ]; then 
+        cp "$1" "$do_rename_OF"
+        case "${1##*.}" in # check file extension of input
+            [Oo][Bb][Jj] )
+                if [ "$m_color" = "UV" ]; then
+                    # Rename material file
+                    cp "${material_file}" "${do_rename_OF}.mtl"
+            #        rm -f "${material_file}" # delete original material file
+                    sed -i "s/${material_file}/${do_rename_OF}.mtl/" "$do_rename_OF"
+                
+                    # Rename texture files
+                    if [ "$fpref_full" = "model_mesh" ]; then
+                        texture_file_pref="${texture_files_unique[0]%.*}" # strip extension
+                        texture_file_ext="${texture_files_unique[0]##*.}" # extension
+                        texture_file_pref_new="${fpref}_texture-v0"
+                        gm convert ${texture_files_unique[0]} "${texture_file_pref_new}.png"
+                        sed -i "s/${texture_file_pref}.${texture_file_ext}/${texture_file_pref_new}.png/" "${do_rename_OF}.mtl"
+                    else
+                        i=0
+                        while [ $i -lt ${#texture_files_unique[@]} ]; do
+                            texture_file_pref=${texture_files_unique[$i]%.*} # strip extension
+                            texture_file_ext="${texture_files_unique[$i]##*.}" # extension
+                            texture_file_pref_new="${fpref}_texture_$i"
+                            cp ${texture_files_unique[$i]} "$texture_file_pref_new.$texture_file_ext"
+                            sed -i "s/${texture_file_pref}/${texture_file_pref_new}/" "${do_rename_OF}.mtl"
+                            i=$(($i+1))
+                        done
+                    fi
+                    #Don't delete original texture file; it may still be used by other models
+                fi
+                ;;
+        esac
+        #    rm -f "$1" # delete original file
+    else
+        echo
+        echo "Output name is the same as input name; file not changed."
+    fi
+    #set +x
+
+    if [ "$fpref_full" = "model_mesh" ]; then
+        #do_scale to -10
+        scale="100"
+        
+        ml_IF="$do_rename_OF"
+        ml_OF="$do_rename_OF"        
+        ml_SF="TEMP3DP_scale.mlx"
+        
+        mlx_begin
+        mlx_scale scale="$scale"
+        mlx_end
+        echo ; echo "Scaling mesh: "
+        run_meshlab
+        return_code=$?
+    fi
+    return_file="$do_rename_OF"
+    return $return_code
+}
+
+
+do_2stl () {
+    # Usage: input_file output_file
+    # returns do_2stl_OF, admesh_log_file
+    # if output_file is blank then the output file name will be automatically set based on the input file name & metadata
+
+    #  echo "2stl: function to convert file to ASCII stl, no color, using MeshLab and then ADMesh."
+    # If input is stl it will be put through admesh to clean it.
+    
+    local return_code
+    
+    if [ -z "$2" ]; then
+        do_metadata "$1"
+    fi
+    m_color="NC"
+    
+    case "${1##*.}" in # check file extension of input
+        [Ss][Tt][Ll] )
+            admesh_IF="$1"
+            ;;  
+        * ) # all other file extensions
+            echo ; echo "Converting to stl: "
+            
+            # Make sure Z is up
+            if [ "$m_up" = "Y" ]; then
+                m_up="Z"
+                ml_SF="TEMP3DP_rotate.mlx"
+                mlx_begin
+                mlx_rotate x=90
+                mlx_end
+            else
+                ml_SF=""
+            fi
+            
+            ml_IF="$1"
+            ml_OF="TEMP3DP_ml_output.stl"            
+            
+            run_meshlab
+            return_code=$?
+            admesh_IF="$ml_OF"
+            ;;
+    esac
+    set_meta
+    
+    if [ -z "$2" ]; then
+        do_2stl_OF="${fpref}${meta}.stl"
+    else
+        do_2stl_OF="$2"
+    fi
+  
+    admesh_log_file="TEMP3DP_admeshlog.txt"
+	echo
+	if [  "$verbosity" -ge 4  ]; then
+		echo "*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*"
+	fi
+    echo -n "    Running ADMesh ... " # clean & output ASCII stl
+    admesh "$admesh_IF" -a "$do_2stl_OF" > "$admesh_log_file"
+    return_code=$?
+    echo "finished, return code: $return_code"
+    
+    if [ "$app_name" = "3DP-2stl" ] || [ "$verbosity" -ge 4  ]; then
+        echo
+        cat "$admesh_log_file"
+    fi
+    	if [ "$verbosity" -ge 4 ]; then
+		echo "*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*"
+	fi
+    
+    if [ $return_code -ne 0 ]; then
+        pause "Uh oh, looks like there's an error. Hit any key to keep going anyway ... "
+    fi
+  
+    if [ "$admesh_IF" != "$1" ]; then  
+        rm -f "$admesh_IF"
+    fi
+    
+    return_file="$do_2stl_OF"
+    return $return_code
+}
+
+do_2objNC () {
+    # Usage: input_file output_file
+    # if output_file is blank then the output file name will be automatically set based on the input file name & metadata
+    # "2objNC: function to convert to obj file with no color data."
+    #  Metadata is also checked unless an output file is provided."
+    # can pass input & output files; output file is optional
+    
+    local return_code
+    
+    if [ -z "$2" ]; then
+        do_metadata "$1"
+        m_color="NC"
+        set_meta
+        do_2objNC_OF="${fpref}-NC${meta}.obj"
+    else
+        m_color="NC"
+        set_meta
+        do_2objNC_OF="${2%.*}.obj"
+    fi
+    
+    echo ; echo "Removing color data from mesh: "
+    ml_IF="$1"
+    ml_OF="$do_2objNC_OF"    
+    ml_SF=""
+    run_meshlab
+    return_code=$?
+    return_file="$do_2objNC_OF" 
+    return $return_code
+}
+
+do_2x3dz  () {
+    # "2x3dz: this function converts a model to x3d format and wraps it along with the associated texture file into a zip file. Primarily intended for submitting color models to Shapeways."
+    
+    local return_code
+    
+    echo ; echo "Converting to x3d: "
+    ml_IF="$1"
+    ml_OF="${fpref_full}.x3d"    
+    ml_SF=""
+    run_meshlab
+
+    do_subfiles "$ml_OF"
+    return_code=$?
+    
+    echo ; echo "Zipping up files ..."
+    # zip up files
+    # zip output.zip input1 input2 input3
+    zip "${fpref_full}.x3d.zip" "$ml_OF" ${texture_files_unique[@]}
+    return_code=$?
+    
+    rm -f "$ml_OF" # delete x3d file
+
+    return_file="${fpref_full}.x3d.zip"
+    return $return_code
+}
+
+do_2objz () {
+    # "obj2objz: this function wraps an obj file and its associated material and texture files into a zip file. Primarily intended for submitting color models to Sculpteo & i.Materialize, but can also be used as a handy way to gather all the associated files together for moving or copying to a different location."
+  
+    #TODO: Sculpteo wants models in Z up!
+    
+    local return_code
+    
+    case "${1##*.}" in
+        [Oo][Bb][Jj] )
+            do_subfiles "$1"
+            
+            echo ; echo "Zipping up files ..."
+            # zip up files
+            # zip output.zip input1 input2 input3
+            zip "${fpref_full}.obj.zip" "$1" "$material_file" ${texture_files_unique[@]}
+            return_code=$?
+            return_file="${fpref_full}.obj.zip"
+            return $return_code
+            ;;
+        * )
+            echo "${1##*.} is not supported; only obj files are supported."
+            exit 1
+            ;;
+    esac
+}
+
+do_center () {
+    # Usage: input_file
+    # output name is same as input name (original is deleted)
+    ## Function to center mesh base on the bottom cross section
+  
+    #TODO: function is currently broken. If it is useful it needs to be rewritten.
+    local offset
+    
+    if [ -z "$m_up" ]; then  
+        do_metadata "$1" # set m_up
+    fi
+    
+    do_measure_size "$1"
+    orig_xmin="$xmin"
+    orig_xmax="$xmax"
+    orig_ymin="$ymin"
+    orig_ymax="$ymax"
+    orig_zmin="$zmin"
+    orig_zmax="$zmax"
+    
+    if [ "$m_up" = "Y" ]; then
+        offset=$(bc <<< "scale=10;(0.5 * $orig_ymax")  #0 # offset from bottom. Take measurement in center, 50% up
+    else
+        offset=$(bc <<< "scale=10;(0.5 * $orig_zmax")  #0 # offset from bottom. Take measurement in center, 50% up
+    fi
+    
+    echo ; echo "Measuring mesh ... "    
+    ml_IF="$1"
+    ml_OF="TEMP3DP_${fpref}_section${meta}.xyz"   
+    ml_SF="TEMP3DP_section.mlx"
+    
+    mlx_begin
+    if [ "$m_up" = "Y" ]; then
+        mlx_section y=0  surface=false
+    else
+        mlx_section z=0  surface=true
+    fi
+    mlx_end
+    run_meshlab
+    return_code=$?
+    
+    do_measure_size "$ml_OF"
+    sect_xmin="$xmin"
+    sect_xmax="$xmax"
+    sect_ymin="$ymin"
+    sect_ymax="$ymax"
+    sect_zmin="$zmin"
+    sect_zmax="$zmax"
+    sect_xsize="$xsize"
+    sect_ysize="$ysize"
+    sect_zsize="$zsize"
+    
+    transx=$(bc <<< "($sect_xsize * 0.5) - $sect_xmax")
+    transy=$(bc <<< "($sect_ysize * 0.5) - $sect_ymax")
+    transz=$(bc <<< "($sect_zsize * 0.5) - $sect_zmax")
+    
+    # translate to middle
+    
+    echo ; echo "Translating mesh ... "    
+    ml_IF="$1"
+    ml_OF="${fpref}_centered${meta}.${1##*.}" 
+    ml_SF="TEMP3DP_translate.mlx"
+    
+    mlx_begin
+    if [ "$m_up" = "Y" ]; then
+        mlx_translate x=$transx z=$transz
+    else
+        mlx_translate x=$transx y=$transy
+    fi
+    mlx_end
+    run_meshlab
+    return_code=$?
+    
+    if [  ]; then #[ -e "$ml_OF" ]; then #rename output to input
+        rm -f "$do_center_bottom_IF"
+        mv "$ml_OF" "$do_center_bottom_IF"
+        case "${1##*.}" in # check file extension
+            [Oo][Bb][Jj] )
+                if [ "$m_color" = "UV" ]; then
+                    # Rename material file
+                    rm -f "${ml_IF}.mtl"
+                    mv "${ml_OF}.mtl" "${do_center_bottom_IF}.mtl"
+                    sed -i "s/${ml_OF}/${do_center_bottom_IF}/" "$do_center_bottom_IF"
+                fi
+                ;;
+        esac
+    fi
+    
+    return_file="$ML_OF" 
+    return $return_code
+}
+
+
+do_center_x () {
+    # Usage: input_file
+    # output name is same as input name (original is deleted)
+    ## Function to center mesh base on the bottom cross section
+  
+    #TODO: function is currently broken. If it is useful it needs to be rewritten.
+    local offset
+    
+    if [ -z "$m_up" ]; then  
+        do_metadata "$1" # set m_up
+    fi
+    
+    do_measure_size "$1"
+    orig_xmin="$xmin"
+    orig_xmax="$xmax"
+    orig_ymin="$ymin"
+    orig_ymax="$ymax"
+    orig_zmin="$zmin"
+    orig_zmax="$zmax"
+    
+    if [ "$m_up" = "Y" ]; then
+        offset=$(bc <<< "scale=10;(0.5 * $orig_ymax")  #0 # offset from bottom. Take measurement in center, 50% up
+    else
+        offset=$(bc <<< "scale=10;(0.5 * $orig_zmax")  #0 # offset from bottom. Take measurement in center, 50% up
+    fi
+    
+    echo ; echo "Measuring mesh ... "    
+    ml_IF="$1"
+    ml_OF="TEMP3DP_${fpref}_section${meta}.xyz"   
+    ml_SF="TEMP3DP_section.mlx"
+    
+    mlx_begin
+    if [ "$m_up" = "Y" ]; then
+        mlx_section y=0  surface=false
+    else
+        mlx_section z=0  surface=true
+    fi
+    mlx_end
+    run_meshlab
+    return_code=$?
+    
+    do_measure_size "$ml_OF"
+    sect_xmin="$xmin"
+    sect_xmax="$xmax"
+    sect_ymin="$ymin"
+    sect_ymax="$ymax"
+    sect_zmin="$zmin"
+    sect_zmax="$zmax"
+    sect_xsize="$xsize"
+    sect_ysize="$ysize"
+    sect_zsize="$zsize"
+    
+    transx=$(bc <<< "($sect_xsize * 0.5) - $sect_xmax")
+    #transy=$(bc <<< "($sect_ysize * 0.5) - $sect_ymax")
+    #transz=$(bc <<< "($sect_zsize * 0.5) - $sect_zmax")
+    
+    # translate to middle
+    
+    echo ; echo "Translating mesh ... "    
+    ml_IF="$1"
+    ml_OF="${fpref}_centerx${meta}.${1##*.}" 
+    ml_SF="TEMP3DP_translate.mlx"
+    
+    mlx_begin
+    mlx_translate x=$transx
+    mlx_end
+    run_meshlab
+    return_code=$?
+    
+    if [  ]; then #[ -e "$ml_OF" ]; then #rename output to input
+        rm -f "$do_center_bottom_IF"
+        mv "$ml_OF" "$do_center_bottom_IF"
+        case "${1##*.}" in # check file extension
+            [Oo][Bb][Jj] )
+                if [ "$m_color" = "UV" ]; then
+                    # Rename material file
+                    rm -f "${ml_IF}.mtl"
+                    mv "${ml_OF}.mtl" "${do_center_bottom_IF}.mtl"
+                    sed -i "s/${ml_OF}/${do_center_bottom_IF}/" "$do_center_bottom_IF"
+                fi
+                ;;
+        esac
+    fi
+    
+    return_file="$ML_OF" 
+    return $return_code
+}
+
+
+#TODO: make UV2jpg script to convert UV textures to jpgs? Intent is to run this prior to uploading to services to decrease upload time.
+
+#TODO: running Patricia through admesh breaks it!
+
+#do_emboss
+
+#do_replace_texture
+#this should work by dragging an obj and the new texture on the file
+#should rename file by default; option to operate in place?
+

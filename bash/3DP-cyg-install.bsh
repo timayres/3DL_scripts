@@ -1,0 +1,11 @@
+#!/bin/bash
+# 3DP-cyg-install.bsh
+# script to install Cygwin based dependencies
+
+if [ ! -e /bin/apt-cyg ]; then
+  lynx -source rawgit.com/transcode-open/apt-cyg/master/apt-cyg > apt-cyg
+  install apt-cyg /bin
+fi
+
+apt-cyg install wget
+apt-cyg install bc pstoedit potrace poppler autotrace zip GraphicsMagick

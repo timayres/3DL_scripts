@@ -1,0 +1,66 @@
+#!/bin/bash
+#utilities.bsh
+#version=.1
+
+#generally useful utility functions
+
+isnumber() {
+    # Function to determine if a variable is a number or a string
+    
+    # Old way; this fails for "0"
+    # regexp='^[-|+|0-9|.][.0-9]*$'
+    # if expr match "$1" "\($regexp\)" &> /dev/null; then
+        # return 0
+    # else
+        # return 1
+    # fi
+    
+    local test
+    test=$(awk -v a="$1" 'BEGIN {print (a == a + 0)}')
+    # The function will return "1" if the argument is a number, otherwise will return "0". This works for integers, floats & scientific notation at least.
+    if [ "$test" = "1" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+trim() {
+    # trim leading & trailing whitespace from variable
+    # from http://stackoverflow.com/questions/369758/how-to-trim-whitespace-from-bash-variable
+    local var="$*"
+    var="${var#"${var%%[![:space:]]*}"}"   # remove leading whitespace characters
+    var="${var%"${var##*[![:space:]]}"}"   # remove trailing whitespace characters
+    echo -n "$var"
+}
+
+cconv() {
+    # Currency converter
+    # Source: http://www.linux-magazine.com/Online/Blogs/Productivity-Sauce/Simple-Bash-Currency-Converter
+    # usage: cconv amt source target, e.g. cconv 11 eur usd
+    #  wget -qO- "http://www.google.com/finance/converter?a=$1&from=$2&to=$3" |  sed '/res/!d;s/<[^>]*>//g';
+    cconv_temp_file="TEMP_cconv.txt"
+    wget -qO- "http://www.google.com/finance/converter?a=$1&from=$2&to=$3" &> "$cconv_temp_file"
+    cat "$cconv_temp_file" | sed '/res/!d;s/<[^>]*>//g' | cut -d" " -f4
+    rm -f "$cconv_temp_file"
+}
+
+silent() {
+    # function to direct output to /dev/null to silence output
+    if [ "$verbosity" -ge 5 ]; then
+        "$@"
+    else
+        "$@" &>/dev/null
+    fi
+}
+
+pause() {
+    # $1 = message string
+    if [ -z "$1" ]; then
+        message="Paused, hit any key to continue ... "
+    else
+        message="$1"
+    fi
+	echo
+	read -rsp "$message" -n1 key
+}

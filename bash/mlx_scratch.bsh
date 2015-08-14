@@ -1,0 +1,202 @@
+#!/bin/bash 
+# scratch script for using mlx functions
+#set -x
+scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
+verbosity=6
+verbose="true" # Print lots of helpful (or annoying) messages, intended mostly for debugging
+delete_TEMP3DP_files="true"
+
+#cd "${scriptpath}/../test_models"
+
+# switches:
+# if [ 1 ]; then # ON, any number or string is true
+# if [ ]; then # OFF, NULL is false
+
+if [ 1 ]; then
+    if [ -z "$1" ]; then 
+        #set "${scriptpath}/../test_models/TEST_MESH_BUST-simplified25K.-10.Z.NC.S.stl" # Sets 1st positional parameter, use absolute path
+        set "${scriptpath}/../test_models/test_section.obj" # Sets 1st positional parameter, use absolute path 
+    fi
+fi
+
+. ${scriptpath}/3DP-main.bsh
+
+#cd "${scriptpath}/../test_models/"
+
+#do_metadata "$fbase"
+#do_subfiles "$fbase"
+#do_measure_size "$fbase"
+
+if [  ]; then
+    ml_IF="$fbase"
+    #ml_OF="TEST_MESH_BUST-simplified25K_H1-simpY0section.-10.Z.NC.S.stl"
+    #ml_OF="${fpref}-create${meta}.stl" #offset(2,3,F)
+    #ml_OF="create_test.stl"
+    #ml_OF="create_test.obj"
+    #ml_OF="test_section.obj"
+    ml_OF="sphere_test.obj"
+    ml_SF="TEMP3DP_mlx_scratch.mlx"
+    ml_LF="" # "TEMP3DP_meshlablog.txt"  
+
+    mlx_begin
+
+    # mlx_measure_geometry #>=1.3.4 # Compute Geometric Measures
+    # mlx_measure_topology #>=1.3.4 # Compute Topological Measures
+    # mlx_del_small_components # Delete Small Components # stl needs vertices merged
+    # mlx_rotate x=90 # Usage: rotAxis angle
+    # mlx_translate x=0 y=0 z=0 # Usage: transX transY transZ
+    # mlx_scale scale=1 # Usage: scale | scaleX scaleY scaleZ
+    # mlx_section y=0 surface=true #>=1.3.4 # Usage: planeAxis planeOffset (line | surface)
+    # mlx_simplify faces=10000 # Usage: TargetFaceNum # stl needs vertices merged
+    # mlx_offset voxel=3 delta=3 #
+    # mlx_offset voxel=2 delta=3 # Usage: cellsize offset
+    # mlx_subdivide 1 # Usage: Iterations
+    # mlx_smooth 1 # Usage: Iterations
+    # mlx_measure_topology
+    
+    if [  ]; then
+        mlx_section z=0 surface=false
+    fi
+    
+    if [  ]; then
+        mlx_offset voxel=1 delta=0.1
+    fi
+
+    if [  ]; then
+        mlx_del_small_components
+        mlx_measure_topology
+    fi
+
+    if [  ]; then
+        mlx_measure_geometry
+        mlx_measure_topology
+    fi
+    
+    if [  ]; then
+        mlx_del_layer
+        #mlx_cube s=10
+        #mlx_square 10 10 true
+        #mlx_cylinder h=5 r1=1 r2=2 fn=100
+
+    fi
+    
+    # Create a target!
+    if [  ]; then
+        fn=50
+        mlx_del_layer
+        mlx_circle r=1
+        mlx_circle r1=3 r2=2
+        mlx_circle r1=5 r2=4
+        mlx_flatten_layers
+    fi
+    
+    # Check sphere subdivisions
+    if [  ]; then
+        mlx_del_layer
+        mlx_sphere r=1 subdiv=0 # F=20
+        mlx_sphere r=1 subdiv=1 # F=80
+        mlx_translate x=3
+        mlx_sphere r=1 subdiv=2 # F=320
+        mlx_translate x=6
+        mlx_sphere r=1 subdiv=3 # F=1280
+        mlx_translate x=9
+        mlx_sphere r=1 subdiv=4 # F=5120
+        mlx_translate x=12
+        mlx_sphere r=1 subdiv=5 # F=20480
+        mlx_translate x=15
+        mlx_sphere r=1 subdiv=6 # F=81920
+        mlx_translate x=18
+        mlx_sphere r=1 subdiv=7 # F=327680
+        mlx_translate x=21
+        #mlx_sphere r=1 subdiv=8 # F=1310720 CRAZY big!
+        #mlx_translate x=24
+        mlx_flatten_layers
+    fi
+
+    
+    mlx_end
+
+    echo ; echo -n "Creating ... "
+    #set -x
+    run_meshlab
+    #meshlabserver -o "$ml_OF" -s "$ml_SF"
+    return_code=$?
+fi
+
+# load file
+if [  ]; then
+    i=0
+    j=0
+    while read type x y z; do
+        if [ "$type" = "v" ]; then
+            vertices[$i]=$x,$y,$z #"\[$x,$y,$z\]"
+            ((i++))
+            #echo $i
+        fi
+        if [ "$type" = "l" ]; then
+            line_segments[$j]=$x,$y #"\[$x,$y,$z\]"
+            ((j++))
+            #echo $i
+        fi        
+    done < test_section.obj
+    
+    # extract head and tail vertex numbers
+    #echo $(echo ${line_segments[0]} | cut -d"," -f1)
+    head=${line_segments[0]%,*}
+    tail=${line_segments[0]#*,}
+    echo head="$head"
+    echo tail="$tail"
+    
+    # read invividual vertex into array
+    OIFS="$IFS"; IFS=,; read -a vertex1 <<< ${vertices[0]}; IFS="$OIFS"
+    echo "vertex 1 ="${vertex1[@]}
+    
+    #line_num=0
+    #i=0
+    #line_1[0]=${line_segments[0]%,*}
+    #line_1[1]=${line_segments[0]#*,}
+    #for a in ${line_segments[@]}; do
+    
+    #reverse array and try again!
+    
+    #done
+    
+    
+    #printf "%s\n" "${vertices[@]}" > vertices.txt
+    #printf "%s\n" "${line_segments[@]}" > line_segments.txt    
+    
+    # http://stackoverflow.com/questions/20294918/extract-file-contents-into-array-using-bash-scripting 
+    # OIFS="$IFS"; IFS=$'\n'; array=($(<file)); IFS="$OIFS"
+    # Copy $IFS, set $IFS to newline, slurp file into array and reset $IFS back again.
+    # OIFS="$IFS"; IFS=,; echo "${my_path[*]}"; IFS="$OIFS"
+    # OIFS="$IFS"; IFS=,; my_path_scad="[${my_path[*]}]"; IFS="$OIFS"
+    # echo "$my_path_scad" THISWORKS!!
+
+fi
+
+if [  ]; then
+    echo ; echo -n "Drop a file here, what happens?"
+    read file
+    echo "$file"
+fi
+
+if [  ]; then
+    do_measure_dimension   y=2 $1 z=5
+fi
+
+if [ 1 ]; then
+    #cd /cygdrive/c/Users/Tim/Desktop/3D\ working\ files/Wright\ Family
+    cd "/cygdrive/c/Users/3DLirious/Desktop/Working Scans/Wright Family/Ben,Crystal&Bradley"
+    pause
+    #do_union "Family_Crystal_bust-simp75K(-10Z).stl" "Family_Ben_bust-simp75K(-10Z).stl"
+    do_union "Family_Crystal_Ben_bust_union_H4-neg_vol(-6Z).stl" "Family_Crystal_bust(-6Z).stl"
+fi
+
+
+##do_measure_dimension "$fbase" x=-.1938705000 y=24.4973510000
+
+pause
+
+#notes:
+# should run more tests, but may not be worthwhile to run offset with multisample. It prevents more small components, but these can be easily deleted. It can take more than twice as long as without. +offset: 41vs1m51s, -offset: 14s vs. 37s
+# works better to select border and dilate than to successively select & delete border
