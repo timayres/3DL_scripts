@@ -1,4 +1,5 @@
 #!/bin/bash
+#license: unlicensed
 # 3DP-cyg-install.bsh
 # script to install Cygwin based dependencies
 
@@ -8,4 +9,5 @@ if [ ! -e /bin/apt-cyg ]; then
 fi
 
 apt-cyg install wget
-apt-cyg install bc pstoedit potrace poppler autotrace zip GraphicsMagick
+apt-cyg install bc zip GraphicsMagick
+# apt-cyg install pstoedit potrace poppler autotrace # optional dependencies for 2D

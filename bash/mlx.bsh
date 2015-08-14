@@ -1,9 +1,8 @@
 #!/bin/bash
 #mlx.bsh
-#version=.1
+#license: GPLv2
 #functions and variables for running MeshLab and mlx scripts
 # filters are based on MeshLab v 1.3.4BETA for 64 bit Windows
-#License:
 
 # REF: test if empty or not:
 # -z true if string is zero
@@ -128,7 +127,7 @@ run_openscad() {
 do_om () {
     # Function to set MeshLab output mask -m options
     # Usage: the file extension as input to this program
-    # Add additional file type support in the future, e.g. ply
+    # TODO: Add additional file type support in the future, e.g. ply
 
     # MeshLab output mask (-m) options:
     # Note: v1.34BETA changed -om switch to -m
@@ -207,6 +206,8 @@ mlx_measure_topology() {
 # Usage: parse_geometry_log "$ml_LF"
 parse_geometry_log() {
     local line_no
+    
+    # TODO: if mesh is non-manifold many of these are undefined. Need to add checks to see if these are actually returning numbers. If not, set as "NAN"?
     
     # xsize=$(grep "Mesh Bounding Box Size" "$1" | cut -d" " -f5)
     # ysize=$(grep "Mesh Bounding Box Size" "$1" | cut -d" " -f6)
@@ -349,7 +350,7 @@ mlx_section() {
     local i
     local axis # The slicing plane is perpendicular to this axis (default Z)
     local offset # cross-plane offset (default 0)
-    local surface # true (default) will create a 2D surface, otherwise will create a 1D outline composed of line segments
+    local surface # false (default) will create a 2D surface, otherwise will create a 1D outline composed of line segments (not a continuous polyline but individual segments)
     
     # Defaults
     axis=2 # Z axis
@@ -358,6 +359,8 @@ mlx_section() {
     
     if [ -z "$mlx_section_customAxis" ]; then mlx_section_customAxis=( 0 0 1 ); fi
     if [ -z "$mlx_section_planeref" ]; then mlx_section_planeref="2"; fi #0=BB Center, 1=BB Min, 2=Origin
+    
+    # TODO: add customaxis in options, i.e. customaxis=x,y,z
     
     for i in "$@"
     do

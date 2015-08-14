@@ -1,6 +1,6 @@
 #!/bin/bash
 #utilities.bsh
-#version=.1
+#license: GPLv2
 
 #generally useful utility functions
 

@@ -1,4 +1,5 @@
 #!/bin/bash
+#license: GPLv2
 # 3DP-generate_windows_scripts.bsh
 # generate windows & cygwin scripts
 
@@ -7,21 +8,17 @@
 apps="
 2x3dz
 2objz
+2stl
+2objNC
 check_mesh
 pricing
 simplify
 scale
 swapYZ
-2stl
-2objNC
 rename
 hollow
-hollow_bust
-hollow_bobblehead
 center
-centerx
 center_x
-center_bottom
 "
 
 scriptpath="$(cd "$(dirname "$0")"; pwd -P)"

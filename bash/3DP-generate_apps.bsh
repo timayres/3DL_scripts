@@ -1,9 +1,7 @@
 #!/bin/bash
-# 3DP-generate_windows_scripts.bsh
+#3DP-generate_windows_scripts.bsh
+#license: GPLv2
 # generate windows & cygwin scripts
-#License: 
-
-#set -x
 
 gen_mlx_scratch_shortcuts="true"
 
@@ -21,8 +19,6 @@ rename
 hollow
 center_x
 "
-#center_bottom
-#hollow_bobblehead
 
 scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
 
@@ -96,6 +92,8 @@ Type=Application
     fi
 done
 
+# TODO: customize settings for certain apps, i.e. change verbosity for 3DP-hollow using sed
+
 # Generate shortcuts for mlx_scratch.bsh
 if [ "$gen_mlx_scratch_shortcuts" = "true" ]; then
     
@@ -129,6 +127,3 @@ Type=Application
         chmod +x "../${app_name}.desktop"    
     fi
 fi
-
-
-

@@ -1,7 +1,7 @@
 #!/bin/bash
-# 3DP-main.bsh
-version=".16devel"
-#License:
+#3DP-main.bsh
+#license: GPLv2
+#version="alpha"
 
 # TODO: write script to generate test models 
 
