@@ -28,7 +28,7 @@ fi
 #do_subfiles "$fbase"
 #do_measure_size "$fbase"
 
-if [  ]; then
+if [ 1 ]; then
     ml_IF="$fbase"
     #ml_OF="${fpref}-create${meta}.stl"
     ml_OF="test.obj"
@@ -52,7 +52,8 @@ if [  ]; then
     # mlx_measure_topology
     
     if [  ]; then
-        mlx_section z=0 surface=false
+        #mlx_section z=0 surface=false
+        mlx_section custom=0 customaxis=,5, surface=true planeref=1
     fi
     
     if [  ]; then

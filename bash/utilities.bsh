@@ -18,7 +18,7 @@ isnumber() {
     local test
     test=$(awk -v a="$1" 'BEGIN {print (a == a + 0)}')
     # The function will return "1" if the argument is a number, otherwise will return "0". This works for integers, floats & scientific notation at least.
-    if [ "$test" = "1" ]; then
+    if [ "$test" -eq 1 ]; then
         return 0
     else
         return 1

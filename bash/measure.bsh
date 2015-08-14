@@ -123,51 +123,50 @@ do_measure_dimension() {
     
     echo ; echo "  Measuring dimension ... "
     
-    for i in "$@"
-    do
-    case $i in
-        [xX]=*)
-            if [ "$first" = "true" ]; then
-                axis1="x"
-                offset1="${i#*=}"
-                first="false"
-            else
-                axis2="x"
-                offset2="${i#*=}"
-            fi
-            shift # past argument=value
-            ;;
-        [yY]=*)
-            if [ "$first" = "true" ]; then
-                axis1="y"
-                offset1="${i#*=}"
-                first="false"
-            else
-                axis2="y"
-                offset2="${i#*=}"
-            fi
-            shift # past argument=value
-            ;;
-        [zZ]=*)
-            if [ "$first" = "true" ]; then
-                axis1="z"
-                offset1="${i#*=}"
-                first="false"
-            else
-                axis2="z"
-                offset2="${i#*=}"
-            fi
-            shift # past argument=value
-            ;;
-        *)
-            if [ -r "$i" ]; then
-                ml_IF="$i"
-            else
-                echo ; echo "Unknown option"
-            fi
-            shift
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            [xX]=*)
+                if [ "$first" = "true" ]; then
+                    axis1="x"
+                    offset1="${i#*=}"
+                    first="false"
+                else
+                    axis2="x"
+                    offset2="${i#*=}"
+                fi
+                shift # past argument=value
+                ;;
+            [yY]=*)
+                if [ "$first" = "true" ]; then
+                    axis1="y"
+                    offset1="${i#*=}"
+                    first="false"
+                else
+                    axis2="y"
+                    offset2="${i#*=}"
+                fi
+                shift # past argument=value
+                ;;
+            [zZ]=*)
+                if [ "$first" = "true" ]; then
+                    axis1="z"
+                    offset1="${i#*=}"
+                    first="false"
+                else
+                    axis2="z"
+                    offset2="${i#*=}"
+                fi
+                shift # past argument=value
+                ;;
+            *)
+                if [ -r "$i" ]; then
+                    ml_IF="$i"
+                else
+                    echo ; echo "Unknown option"
+                fi
+                shift
+                ;;
+        esac
     done
     
     # Do some checking on the validity of the input

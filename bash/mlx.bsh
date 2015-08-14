@@ -340,70 +340,84 @@ parse_topology_log() {
     return 0
 }
 
-# Usage: mlx_section X=|Y=|(Z=0)|custom= surface=(false)
-# TIP: surfaces can also be simplified after geneation
+# Usage: mlx_section X=|Y=|(Z=0)|custom= surface=(false) customaxis=x,y,z planeref=(2)
+# TIP: surfaces can also be simplified after generation
 # Recommended extensions:
 # surface: stl, obj
 # line: dxf, obj (need to process obj)
 # points: xyz (for measuring size)
 mlx_section() {
     local i
+    local j
     local axis # The slicing plane is perpendicular to this axis (default Z)
     local offset # cross-plane offset (default 0)
     local surface # false (default) will create a 2D surface, otherwise will create a 1D outline composed of line segments (not a continuous polyline but individual segments)
+    local customaxis # custom axis (vector)
+    local planeref #the reference from which the planes are shifted
     
     # Defaults
     axis=2 # Z axis
-    offset="0"
+    offset=0
     surface="false"
+    customaxis=( 0 0 1 )
+    planeref=2 #0=BB Center, 1=BB Min, 2=Origin
     
-    if [ -z "$mlx_section_customAxis" ]; then mlx_section_customAxis=( 0 0 1 ); fi
-    if [ -z "$mlx_section_planeref" ]; then mlx_section_planeref="2"; fi #0=BB Center, 1=BB Min, 2=Origin
-    
-    # TODO: add customaxis in options, i.e. customaxis=x,y,z
-    
-    for i in "$@"
-    do
-    case $i in
-        [xX]=*)
-            axis=0 # X axis
-            offset="${i#*=}"
-            shift # past argument=value
-            ;;
-        [yY]=*)
-            axis=1 # Y axis
-            offset="${i#*=}"
-            shift # past argument=value
-            ;;
-        [zZ]=*)
-            axis=2 # Z axis
-            offset="${i#*=}"
-            shift # past argument=value
-            ;;
-        custom=*)
-            axis=3 # Custom axis
-            if [[ " ${mlx_section_customAxis[@]} " = " 0 0 1 " ]]; then
-                echo ; echo "WARNING: mlx_section_customAxis is not set! Default value will be used."
-            fi
-            offset="${i#*=}"
-            shift # past argument=value
-            ;;
-        surface=*)
-            surface="${i#*=}"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            [xX]=*)
+                axis=0 # X axis
+                offset="${i#*=}"
+                shift # past argument=value
+                ;;
+            [yY]=*)
+                axis=1 # Y axis
+                offset="${i#*=}"
+                shift # past argument=value
+                ;;
+            [zZ]=*)
+                axis=2 # Z axis
+                offset="${i#*=}"
+                shift # past argument=value
+                ;;
+            custom=*)
+                axis=3 # Custom axis
+                offset="${i#*=}"
+                shift # past argument=value
+                ;;
+            surface=*)
+                surface="${i#*=}"
+                shift # past argument=value
+                ;;
+            customaxis=*)
+                OIFS="$IFS"; IFS=,; read -a customaxis <<< "${i#*=}"; IFS="$OIFS"
+                for j in "${customaxis[@]}"; do
+                    #echo "j=\"$j\""
+                    if [ -z "$j" ]; then customaxis[j]=0; fi
+                done
+                if [ ${#customaxis[@]} -eq 2 ]; then customaxis[2]=0; fi # sets z axis to 0 if left blank
+                #echo "customaxis = ( ${customaxis[@]} )"
+                shift # past argument=value
+                ;;
+            planeref=*)
+                planeref="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
+    
+    if [ "$axis" -eq 3 ] && [[ " ${customaxis[@]} " = " 0 0 1 " ]]; then
+        echo ; echo "WARNING: a custom axis was selected, however \"customaxis=\" was not provided. Using default (Z) instead."
+    fi
     
     echo "\
     <filter name=\"Compute Planar Section\">
         <Param name=\"planeAxis\" description=\"Plane perpendicular to\" value=\"$axis\" enum_val0=\"X Axis\" enum_val1=\"Y Axis\" enum_val2=\"Z Axis\" enum_val3=\"Custom Axis\" enum_cardinality=\"4\" type=\"RichEnum\" tooltip=\"The Slicing plane will be done perpendicular to the axis\"/>
-        <Param name=\"customAxis\" description=\"Custom axis\" x=\"${mlx_section_customAxis[0]}\" y=\"${mlx_section_customAxis[1]}\" z=\"${mlx_section_customAxis[2]}\" type=\"RichPoint3f\" tooltip=\"Specify a custom axis, this is only valid if the above parameter is set to Custom\"/>
+        <Param name=\"customAxis\" description=\"Custom axis\" x=\"${customaxis[0]}\" y=\"${customaxis[1]}\" z=\"${customaxis[2]}\" type=\"RichPoint3f\" tooltip=\"Specify a custom axis, this is only valid if the above parameter is set to Custom\"/>
         <Param name=\"planeOffset\" description=\"Cross plane offset\" value=\"$offset\" type=\"RichFloat\" tooltip=\"Specify an offset of the cross-plane. The offset corresponds to the distance from the point specified in the plane reference parameter. By default (Cross plane offset == 0)\"/>
-        <Param name=\"relativeTo\" description=\"plane reference\" value=\"$mlx_section_planeref\" enum_val0=\"Bounding box center\" enum_val1=\"Bounding box min\" enum_val2=\"Origin\" enum_cardinality=\"3\" type=\"RichEnum\" tooltip=\"Specify the reference from which the planes are shifted\"/>
+        <Param name=\"relativeTo\" description=\"plane reference\" value=\"$planeref\" enum_val0=\"Bounding box center\" enum_val1=\"Bounding box min\" enum_val2=\"Origin\" enum_cardinality=\"3\" type=\"RichEnum\" tooltip=\"Specify the reference from which the planes are shifted\"/>
         <Param name=\"createSectionSurface\" description=\"Create also section surface\" value=\"$surface\" type=\"RichBool\" tooltip=\"If selected, in addition to a layer with the section polyline, it will be created also a layer with a triangulated version of the section polyline. This only works if the section polyline is closed\"/>
     </filter>" >> "$ml_SF"
 }
@@ -422,17 +436,16 @@ mlx_merge_V () {
     # Defaults
     threshold="0"
     
-    for i in "$@"
-    do
-    case $i in
-        t=*|threshold=*)
-            threshold="${i#*=}"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            t=*|threshold=*)
+                threshold="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
 
     echo "\
@@ -457,17 +470,16 @@ mlx_close_holes() {
     if [ -z "$mlx_close_holes_NewFaceSelected" ]; then mlx_close_holes_NewFaceSelected="true"; fi
     if [ -z "$mlx_close_holes_SelfIntersection" ]; then mlx_close_holes_SelfIntersection="true"; fi
     
-    for i in "$@"
-    do
-    case $i in
-        max=*|MaxHoleSize=*)
-            MaxHoleSize="${i#*=}"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            max=*|MaxHoleSize=*)
+                MaxHoleSize="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
     
     echo "\
@@ -487,17 +499,16 @@ mlx_grow_holes() {
     # Defaults
     iterations="3"
     
-    for i in "$@"
-    do
-    case $i in
-        i=*|iterations=*)
-            iterations="${i#*=}"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            i=*|iterations=*)
+                iterations="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
    
     mlx_sel_border
@@ -579,17 +590,16 @@ mlx_grow_sel() {
     # Defaults
     iterations="1"
     
-    for i in "$@"
-    do
-    case $i in
-        i=*|iterations=*)
-            iterations="${i#*=}"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            i=*|iterations=*)
+                iterations="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
     
     j=0
@@ -608,8 +618,7 @@ mlx_shrink_sel() {
     # Defaults
     iterations="1"
     
-    for i in "$@"
-    do
+    for i in "$@"; do
     case $i in
         i=*|iterations=*)
             iterations="${i#*=}"
@@ -662,17 +671,16 @@ mlx_sel_small_components() {
     
     if [ -z "$mlx_sel_small_components_NonClosedOnly" ]; then mlx_sel_small_components_NonClosedOnly="false"; fi
     
-    for i in "$@"
-    do
-    case $i in
-        ratio=*)
-            ratio="${i#*=}"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            ratio=*)
+                ratio="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
     
     echo "\
@@ -732,25 +740,24 @@ mlx_translate() {
     if [ -z "$mlx_translate_Freeze" ]; then mlx_translate_Freeze="true"; fi
     if [ -z "$mlx_translate_ToAll" ]; then mlx_translate_ToAll="false"; fi
     
-    for i in "$@"
-    do
-    case $i in
-        [xX]=*)
-            transX="${i#*=}"
-            shift # past argument=value
-            ;;
-        [yY]=*)
-            transY="${i#*=}"
-            shift # past argument=value
-            ;;
-        [zZ]=*)
-            transZ="${i#*=}"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            [xX]=*)
+                transX="${i#*=}"
+                shift # past argument=value
+                ;;
+            [yY]=*)
+                transY="${i#*=}"
+                shift # past argument=value
+                ;;
+            [zZ]=*)
+                transZ="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
     
     echo "\
@@ -784,84 +791,83 @@ mlx_rotate() {
     if [ -z "$mlx_rotate_Freeze" ]; then mlx_rotate_Freeze="true"; fi
     if [ -z "$mlx_rotate_ToAll" ]; then mlx_rotate_ToAll="false"; fi
     
-    for i in "$@"
-    do
-    case $i in
-        [xX]=*)
-            axis=0 # X axis
-            angle="${i#*=}"
-            echo "\
-    <filter name=\"Transform: Rotate\">
-        <Param name=\"rotAxis\" description=\"Rotation on:\" value=\"$axis\" enum_val0=\"X axis\" enum_val1=\"Y axis\" enum_val2=\"Z axis\" enum_val3=\"custom axis\"  enum_cardinality=\"4\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
-        <Param name=\"rotCenter\" description=\"Center of rotation:\" value=\"$mlx_rotate_rotCenter\" enum_val0=\"origin\" enum_val1=\"barycenter\" enum_val2=\"custom point\" enum_cardinality=\"3\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
-        <Param name=\"angle\" description=\"Rotation Angle\" value=\"$angle\" min=\"-360\" max=\"360\" type=\"RichDynamicFloat\" tooltip=\"Angle of rotation (in &lt;b>degree&lt;/b>). If snapping is enabled this value is rounded according to the snap value\"/>
-        <Param name=\"snapFlag\" description=\"Snap angle\" value=\"$mlx_rotate_snapFlag\" type=\"RichBool\" tooltip=\"If selected, before starting the filter will remove any unreferenced vertex (for which curvature values are not defined)\"/>
-        <Param name=\"customAxis\" description=\"Custom axis\" x=\"${mlx_rotate_customAxis[0]}\" y=\"${mlx_rotate_customAxis[1]}\" z=\"${mlx_rotate_customAxis[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation axis is used only if the 'custom axis' option is chosen.\"/>
-        <Param name=\"customCenter\" description=\"Custom center\" x=\"${mlx_rotate_customCenter[0]}\" y=\"${mlx_rotate_customCenter[1]}\" z=\"${mlx_rotate_customCenter[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation center is used only if the 'custom point' option is chosen.\"/>
-        <Param name=\"snapAngle\" description=\"Snapping Value\" value=\"$mlx_rotate_snapAngle\" type=\"RichFloat\" tooltip=\"This value is used to snap the rotation angle.\"/>
-        <Param name=\"Freeze\" description=\"Freeze Matrix\" value=\"$mlx_rotate_Freeze\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied and the vertex coords are actually changed\"/>
-        <Param name=\"ToAll\" description=\"Apply to all layers\" value=\"$mlx_rotate_ToAll\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied to all the mesh and raster layers in the project\"/>
-    </filter>" >> "$ml_SF"
-            shift # past argument=value
-            ;;
-        [yY]=*)
-            axis=1 # Y axis
-            angle="${i#*=}"
-            echo "\
-    <filter name=\"Transform: Rotate\">
-        <Param name=\"rotAxis\" description=\"Rotation on:\" value=\"$axis\" enum_val0=\"X axis\" enum_val1=\"Y axis\" enum_val2=\"Z axis\" enum_val3=\"custom axis\"  enum_cardinality=\"4\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
-        <Param name=\"rotCenter\" description=\"Center of rotation:\" value=\"$mlx_rotate_rotCenter\" enum_val0=\"origin\" enum_val1=\"barycenter\" enum_val2=\"custom point\" enum_cardinality=\"3\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
-        <Param name=\"angle\" description=\"Rotation Angle\" value=\"$angle\" min=\"-360\" max=\"360\" type=\"RichDynamicFloat\" tooltip=\"Angle of rotation (in &lt;b>degree&lt;/b>). If snapping is enabled this value is rounded according to the snap value\"/>
-        <Param name=\"snapFlag\" description=\"Snap angle\" value=\"$mlx_rotate_snapFlag\" type=\"RichBool\" tooltip=\"If selected, before starting the filter will remove any unreferenced vertex (for which curvature values are not defined)\"/>
-        <Param name=\"customAxis\" description=\"Custom axis\" x=\"${mlx_rotate_customAxis[0]}\" y=\"${mlx_rotate_customAxis[1]}\" z=\"${mlx_rotate_customAxis[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation axis is used only if the 'custom axis' option is chosen.\"/>
-        <Param name=\"customCenter\" description=\"Custom center\" x=\"${mlx_rotate_customCenter[0]}\" y=\"${mlx_rotate_customCenter[1]}\" z=\"${mlx_rotate_customCenter[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation center is used only if the 'custom point' option is chosen.\"/>
-        <Param name=\"snapAngle\" description=\"Snapping Value\" value=\"$mlx_rotate_snapAngle\" type=\"RichFloat\" tooltip=\"This value is used to snap the rotation angle.\"/>
-        <Param name=\"Freeze\" description=\"Freeze Matrix\" value=\"$mlx_rotate_Freeze\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied and the vertex coords are actually changed\"/>
-        <Param name=\"ToAll\" description=\"Apply to all layers\" value=\"$mlx_rotate_ToAll\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied to all the mesh and raster layers in the project\"/>
-    </filter>" >> "$ml_SF"
-            shift # past argument=value
-            ;;
-        [zZ]=*)
-            axis=2 # Z axis
-            angle="${i#*=}"
-            echo "\
-    <filter name=\"Transform: Rotate\">
-        <Param name=\"rotAxis\" description=\"Rotation on:\" value=\"$axis\" enum_val0=\"X axis\" enum_val1=\"Y axis\" enum_val2=\"Z axis\" enum_val3=\"custom axis\"  enum_cardinality=\"4\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
-        <Param name=\"rotCenter\" description=\"Center of rotation:\" value=\"$mlx_rotate_rotCenter\" enum_val0=\"origin\" enum_val1=\"barycenter\" enum_val2=\"custom point\" enum_cardinality=\"3\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
-        <Param name=\"angle\" description=\"Rotation Angle\" value=\"$angle\" min=\"-360\" max=\"360\" type=\"RichDynamicFloat\" tooltip=\"Angle of rotation (in &lt;b>degree&lt;/b>). If snapping is enabled this value is rounded according to the snap value\"/>
-        <Param name=\"snapFlag\" description=\"Snap angle\" value=\"$mlx_rotate_snapFlag\" type=\"RichBool\" tooltip=\"If selected, before starting the filter will remove any unreferenced vertex (for which curvature values are not defined)\"/>
-        <Param name=\"customAxis\" description=\"Custom axis\" x=\"${mlx_rotate_customAxis[0]}\" y=\"${mlx_rotate_customAxis[1]}\" z=\"${mlx_rotate_customAxis[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation axis is used only if the 'custom axis' option is chosen.\"/>
-        <Param name=\"customCenter\" description=\"Custom center\" x=\"${mlx_rotate_customCenter[0]}\" y=\"${mlx_rotate_customCenter[1]}\" z=\"${mlx_rotate_customCenter[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation center is used only if the 'custom point' option is chosen.\"/>
-        <Param name=\"snapAngle\" description=\"Snapping Value\" value=\"$mlx_rotate_snapAngle\" type=\"RichFloat\" tooltip=\"This value is used to snap the rotation angle.\"/>
-        <Param name=\"Freeze\" description=\"Freeze Matrix\" value=\"$mlx_rotate_Freeze\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied and the vertex coords are actually changed\"/>
-        <Param name=\"ToAll\" description=\"Apply to all layers\" value=\"$mlx_rotate_ToAll\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied to all the mesh and raster layers in the project\"/>
-    </filter>" >> "$ml_SF"
-            shift # past argument=value
-            ;;
-        custom=*)
-            axis=3 # Custom axis
-            if [[ " ${mlx_rotate_customAxis[@]} " = " 0 0 0 " ]]; then
-                echo ; echo "WARNING: mlx_rotate_customAxis is not set! Default value will be used."
-            fi
-            angle="${i#*=}"
-            echo "\
-    <filter name=\"Transform: Rotate\">
-        <Param name=\"rotAxis\" description=\"Rotation on:\" value=\"$axis\" enum_val0=\"X axis\" enum_val1=\"Y axis\" enum_val2=\"Z axis\" enum_val3=\"custom axis\"  enum_cardinality=\"4\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
-        <Param name=\"rotCenter\" description=\"Center of rotation:\" value=\"$mlx_rotate_rotCenter\" enum_val0=\"origin\" enum_val1=\"barycenter\" enum_val2=\"custom point\" enum_cardinality=\"3\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
-        <Param name=\"angle\" description=\"Rotation Angle\" value=\"$angle\" min=\"-360\" max=\"360\" type=\"RichDynamicFloat\" tooltip=\"Angle of rotation (in &lt;b>degree&lt;/b>). If snapping is enabled this value is rounded according to the snap value\"/>
-        <Param name=\"snapFlag\" description=\"Snap angle\" value=\"$mlx_rotate_snapFlag\" type=\"RichBool\" tooltip=\"If selected, before starting the filter will remove any unreferenced vertex (for which curvature values are not defined)\"/>
-        <Param name=\"customAxis\" description=\"Custom axis\" x=\"${mlx_rotate_customAxis[0]}\" y=\"${mlx_rotate_customAxis[1]}\" z=\"${mlx_rotate_customAxis[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation axis is used only if the 'custom axis' option is chosen.\"/>
-        <Param name=\"customCenter\" description=\"Custom center\" x=\"${mlx_rotate_customCenter[0]}\" y=\"${mlx_rotate_customCenter[1]}\" z=\"${mlx_rotate_customCenter[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation center is used only if the 'custom point' option is chosen.\"/>
-        <Param name=\"snapAngle\" description=\"Snapping Value\" value=\"$mlx_rotate_snapAngle\" type=\"RichFloat\" tooltip=\"This value is used to snap the rotation angle.\"/>
-        <Param name=\"Freeze\" description=\"Freeze Matrix\" value=\"$mlx_rotate_Freeze\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied and the vertex coords are actually changed\"/>
-        <Param name=\"ToAll\" description=\"Apply to all layers\" value=\"$mlx_rotate_ToAll\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied to all the mesh and raster layers in the project\"/>
-    </filter>" >> "$ml_SF"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            [xX]=*)
+                axis=0 # X axis
+                angle="${i#*=}"
+                echo "\
+        <filter name=\"Transform: Rotate\">
+            <Param name=\"rotAxis\" description=\"Rotation on:\" value=\"$axis\" enum_val0=\"X axis\" enum_val1=\"Y axis\" enum_val2=\"Z axis\" enum_val3=\"custom axis\"  enum_cardinality=\"4\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
+            <Param name=\"rotCenter\" description=\"Center of rotation:\" value=\"$mlx_rotate_rotCenter\" enum_val0=\"origin\" enum_val1=\"barycenter\" enum_val2=\"custom point\" enum_cardinality=\"3\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
+            <Param name=\"angle\" description=\"Rotation Angle\" value=\"$angle\" min=\"-360\" max=\"360\" type=\"RichDynamicFloat\" tooltip=\"Angle of rotation (in &lt;b>degree&lt;/b>). If snapping is enabled this value is rounded according to the snap value\"/>
+            <Param name=\"snapFlag\" description=\"Snap angle\" value=\"$mlx_rotate_snapFlag\" type=\"RichBool\" tooltip=\"If selected, before starting the filter will remove any unreferenced vertex (for which curvature values are not defined)\"/>
+            <Param name=\"customAxis\" description=\"Custom axis\" x=\"${mlx_rotate_customAxis[0]}\" y=\"${mlx_rotate_customAxis[1]}\" z=\"${mlx_rotate_customAxis[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation axis is used only if the 'custom axis' option is chosen.\"/>
+            <Param name=\"customCenter\" description=\"Custom center\" x=\"${mlx_rotate_customCenter[0]}\" y=\"${mlx_rotate_customCenter[1]}\" z=\"${mlx_rotate_customCenter[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation center is used only if the 'custom point' option is chosen.\"/>
+            <Param name=\"snapAngle\" description=\"Snapping Value\" value=\"$mlx_rotate_snapAngle\" type=\"RichFloat\" tooltip=\"This value is used to snap the rotation angle.\"/>
+            <Param name=\"Freeze\" description=\"Freeze Matrix\" value=\"$mlx_rotate_Freeze\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied and the vertex coords are actually changed\"/>
+            <Param name=\"ToAll\" description=\"Apply to all layers\" value=\"$mlx_rotate_ToAll\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied to all the mesh and raster layers in the project\"/>
+        </filter>" >> "$ml_SF"
+                shift # past argument=value
+                ;;
+            [yY]=*)
+                axis=1 # Y axis
+                angle="${i#*=}"
+                echo "\
+        <filter name=\"Transform: Rotate\">
+            <Param name=\"rotAxis\" description=\"Rotation on:\" value=\"$axis\" enum_val0=\"X axis\" enum_val1=\"Y axis\" enum_val2=\"Z axis\" enum_val3=\"custom axis\"  enum_cardinality=\"4\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
+            <Param name=\"rotCenter\" description=\"Center of rotation:\" value=\"$mlx_rotate_rotCenter\" enum_val0=\"origin\" enum_val1=\"barycenter\" enum_val2=\"custom point\" enum_cardinality=\"3\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
+            <Param name=\"angle\" description=\"Rotation Angle\" value=\"$angle\" min=\"-360\" max=\"360\" type=\"RichDynamicFloat\" tooltip=\"Angle of rotation (in &lt;b>degree&lt;/b>). If snapping is enabled this value is rounded according to the snap value\"/>
+            <Param name=\"snapFlag\" description=\"Snap angle\" value=\"$mlx_rotate_snapFlag\" type=\"RichBool\" tooltip=\"If selected, before starting the filter will remove any unreferenced vertex (for which curvature values are not defined)\"/>
+            <Param name=\"customAxis\" description=\"Custom axis\" x=\"${mlx_rotate_customAxis[0]}\" y=\"${mlx_rotate_customAxis[1]}\" z=\"${mlx_rotate_customAxis[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation axis is used only if the 'custom axis' option is chosen.\"/>
+            <Param name=\"customCenter\" description=\"Custom center\" x=\"${mlx_rotate_customCenter[0]}\" y=\"${mlx_rotate_customCenter[1]}\" z=\"${mlx_rotate_customCenter[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation center is used only if the 'custom point' option is chosen.\"/>
+            <Param name=\"snapAngle\" description=\"Snapping Value\" value=\"$mlx_rotate_snapAngle\" type=\"RichFloat\" tooltip=\"This value is used to snap the rotation angle.\"/>
+            <Param name=\"Freeze\" description=\"Freeze Matrix\" value=\"$mlx_rotate_Freeze\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied and the vertex coords are actually changed\"/>
+            <Param name=\"ToAll\" description=\"Apply to all layers\" value=\"$mlx_rotate_ToAll\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied to all the mesh and raster layers in the project\"/>
+        </filter>" >> "$ml_SF"
+                shift # past argument=value
+                ;;
+            [zZ]=*)
+                axis=2 # Z axis
+                angle="${i#*=}"
+                echo "\
+        <filter name=\"Transform: Rotate\">
+            <Param name=\"rotAxis\" description=\"Rotation on:\" value=\"$axis\" enum_val0=\"X axis\" enum_val1=\"Y axis\" enum_val2=\"Z axis\" enum_val3=\"custom axis\"  enum_cardinality=\"4\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
+            <Param name=\"rotCenter\" description=\"Center of rotation:\" value=\"$mlx_rotate_rotCenter\" enum_val0=\"origin\" enum_val1=\"barycenter\" enum_val2=\"custom point\" enum_cardinality=\"3\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
+            <Param name=\"angle\" description=\"Rotation Angle\" value=\"$angle\" min=\"-360\" max=\"360\" type=\"RichDynamicFloat\" tooltip=\"Angle of rotation (in &lt;b>degree&lt;/b>). If snapping is enabled this value is rounded according to the snap value\"/>
+            <Param name=\"snapFlag\" description=\"Snap angle\" value=\"$mlx_rotate_snapFlag\" type=\"RichBool\" tooltip=\"If selected, before starting the filter will remove any unreferenced vertex (for which curvature values are not defined)\"/>
+            <Param name=\"customAxis\" description=\"Custom axis\" x=\"${mlx_rotate_customAxis[0]}\" y=\"${mlx_rotate_customAxis[1]}\" z=\"${mlx_rotate_customAxis[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation axis is used only if the 'custom axis' option is chosen.\"/>
+            <Param name=\"customCenter\" description=\"Custom center\" x=\"${mlx_rotate_customCenter[0]}\" y=\"${mlx_rotate_customCenter[1]}\" z=\"${mlx_rotate_customCenter[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation center is used only if the 'custom point' option is chosen.\"/>
+            <Param name=\"snapAngle\" description=\"Snapping Value\" value=\"$mlx_rotate_snapAngle\" type=\"RichFloat\" tooltip=\"This value is used to snap the rotation angle.\"/>
+            <Param name=\"Freeze\" description=\"Freeze Matrix\" value=\"$mlx_rotate_Freeze\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied and the vertex coords are actually changed\"/>
+            <Param name=\"ToAll\" description=\"Apply to all layers\" value=\"$mlx_rotate_ToAll\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied to all the mesh and raster layers in the project\"/>
+        </filter>" >> "$ml_SF"
+                shift # past argument=value
+                ;;
+            custom=*)
+                axis=3 # Custom axis
+                if [[ " ${mlx_rotate_customAxis[@]} " = " 0 0 0 " ]]; then
+                    echo ; echo "WARNING: mlx_rotate_customAxis is not set! Default value will be used."
+                fi
+                angle="${i#*=}"
+                echo "\
+        <filter name=\"Transform: Rotate\">
+            <Param name=\"rotAxis\" description=\"Rotation on:\" value=\"$axis\" enum_val0=\"X axis\" enum_val1=\"Y axis\" enum_val2=\"Z axis\" enum_val3=\"custom axis\"  enum_cardinality=\"4\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
+            <Param name=\"rotCenter\" description=\"Center of rotation:\" value=\"$mlx_rotate_rotCenter\" enum_val0=\"origin\" enum_val1=\"barycenter\" enum_val2=\"custom point\" enum_cardinality=\"3\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
+            <Param name=\"angle\" description=\"Rotation Angle\" value=\"$angle\" min=\"-360\" max=\"360\" type=\"RichDynamicFloat\" tooltip=\"Angle of rotation (in &lt;b>degree&lt;/b>). If snapping is enabled this value is rounded according to the snap value\"/>
+            <Param name=\"snapFlag\" description=\"Snap angle\" value=\"$mlx_rotate_snapFlag\" type=\"RichBool\" tooltip=\"If selected, before starting the filter will remove any unreferenced vertex (for which curvature values are not defined)\"/>
+            <Param name=\"customAxis\" description=\"Custom axis\" x=\"${mlx_rotate_customAxis[0]}\" y=\"${mlx_rotate_customAxis[1]}\" z=\"${mlx_rotate_customAxis[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation axis is used only if the 'custom axis' option is chosen.\"/>
+            <Param name=\"customCenter\" description=\"Custom center\" x=\"${mlx_rotate_customCenter[0]}\" y=\"${mlx_rotate_customCenter[1]}\" z=\"${mlx_rotate_customCenter[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation center is used only if the 'custom point' option is chosen.\"/>
+            <Param name=\"snapAngle\" description=\"Snapping Value\" value=\"$mlx_rotate_snapAngle\" type=\"RichFloat\" tooltip=\"This value is used to snap the rotation angle.\"/>
+            <Param name=\"Freeze\" description=\"Freeze Matrix\" value=\"$mlx_rotate_Freeze\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied and the vertex coords are actually changed\"/>
+            <Param name=\"ToAll\" description=\"Apply to all layers\" value=\"$mlx_rotate_ToAll\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied to all the mesh and raster layers in the project\"/>
+        </filter>" >> "$ml_SF"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
 }
 
@@ -885,34 +891,33 @@ mlx_scale() {
     if [ -z "$mlx_scale_Freeze" ]; then mlx_scale_Freeze="true"; fi
     if [ -z "$mlx_scale_ToAll" ]; then mlx_scale_ToAll="false"; fi
     
-    for i in "$@"
-    do
-    case $i in
-        s=*|scale=*)
-            scaleX="${i#*=}"
-            scaleY="${i#*=}"
-            scaleZ="${i#*=}"
-            shift # past argument=value
-            ;;
-        [xX]=*)
-            scaleX="${i#*=}"
-            uniform="false"
-            shift # past argument=value
-            ;;
-        [yY]=*)
-            scaleY="${i#*=}"
-            uniform="false"
-            shift # past argument=value
-            ;;
-        [zZ]=*)
-            scaleZ="${i#*=}"
-            uniform="false"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            s=*|scale=*)
+                scaleX="${i#*=}"
+                scaleY="${i#*=}"
+                scaleZ="${i#*=}"
+                shift # past argument=value
+                ;;
+            [xX]=*)
+                scaleX="${i#*=}"
+                uniform="false"
+                shift # past argument=value
+                ;;
+            [yY]=*)
+                scaleY="${i#*=}"
+                uniform="false"
+                shift # past argument=value
+                ;;
+            [zZ]=*)
+                scaleZ="${i#*=}"
+                uniform="false"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
     
     echo "\
@@ -961,17 +966,16 @@ mlx_simplify() {
     if [ -z "$mlx_simplify_PlanarQuadric" ]; then mlx_simplify_PlanarQuadric="false"; fi
     if [ -z "$mlx_simplify_Selected" ]; then mlx_simplify_Selected="false"; fi
     
-    for i in "$@"
-    do
-    case $i in
-        [fF]=*|faces=*)
-            faces="${i#*=}"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            [fF]=*|faces=*)
+                faces="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
     
     if [ -z "$m_color" ]; then set_m_color "$ml_IF"; fi # set m_color based on input file
@@ -1046,21 +1050,20 @@ mlx_offset() {
     if [ -z "$mlx_offset_multisample" ]; then mlx_offset_multisample="false"; fi
     if [ -z "$mlx_offset_absDist" ]; then mlx_offset_absDist="false"; fi
     
-    for i in "$@"
-    do
-    case $i in
-        voxel=*)
-            voxel="${i#*=}"
-            shift # past argument=value
-            ;;
-        d=*|delta=*)
-            delta="${i#*=}"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            voxel=*)
+                voxel="${i#*=}"
+                shift # past argument=value
+                ;;
+            d=*|delta=*)
+                delta="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
     
     echo "\
@@ -1086,17 +1089,16 @@ mlx_subdivide() {
     if [ -z "$mlx_subdivide_Threshold" ]; then mlx_subdivide_Threshold="0"; fi
     if [ -z "$mlx_subdivide_Selected" ]; then mlx_subdivide_Selected="false"; fi
     
-    for i in "$@"
-    do
-    case $i in
-        i=*|iterations=*)
-            iterations="${i#*=}"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            i=*|iterations=*)
+                iterations="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
     
     echo "\
@@ -1120,17 +1122,16 @@ mlx_smooth() {
     if [ -z "$mlx_smooth_cotangentWeight" ]; then mlx_smooth_cotangentWeight="true"; fi
     if [ -z "$mlx_smooth_Selected" ]; then mlx_smooth_Selected="false"; fi
     
-    for i in "$@"
-    do
-    case $i in
-        i=*|iterations=*)
-            iterations="${i#*=}"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            i=*|iterations=*)
+                iterations="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
     
     echo "\
@@ -1170,17 +1171,16 @@ mlx_flatten_layers() {
     if [ -z "$mlx_flatten_layers_del_Layer" ]; then mlx_flatten_layers_del_Layer="true"; fi
     if [ -z "$mlx_flatten_layers_Keep_Unreferenced_V" ]; then mlx_flatten_layers_Keep_Unreferenced_V="false"; fi
     
-    for i in "$@"
-    do
-    case $i in
-        merge_V=*)
-            merge_V="${i#*=}"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            merge_V=*)
+                merge_V="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
 
     echo "\
@@ -1203,17 +1203,16 @@ mlx_rename_layer() {
     local i
     local layer
     
-    for i in "$@"
-    do
-    case $i in
-        l=*|layer=*)
-            layer="${i#*=}"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            l=*|layer=*)
+                layer="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
     
     echo "\
@@ -1229,17 +1228,16 @@ mlx_change_layer() {
     local i
     local layer
     
-    for i in "$@"
-    do
-    case $i in
-        l=*|layer=*)
-            layer="${i#*=}"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            l=*|layer=*)
+                layer="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
     
     echo "\
@@ -1286,35 +1284,34 @@ mlx_cube() {
     sizeZ="1"
     center="false"
     
-    for i in "$@"
-    do
-    case $i in
-        s=*|size=*)
-            sizeX="${i#*=}"
-            sizeY="${i#*=}"
-            sizeZ="${i#*=}"
-            shift # past argument=value
-            ;;
-        [xX]=*)
-            sizeX="${i#*=}"
-            shift # past argument=value
-            ;;
-        [yY]=*)
-            sizeY="${i#*=}"
-            shift # past argument=value
-            ;;
-        [zZ]=*)
-            sizeZ="${i#*=}"
-            shift # past argument=value
-            ;;
-        c=*|center=*)
-            center="${i#*=}"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            s=*|size=*)
+                sizeX="${i#*=}"
+                sizeY="${i#*=}"
+                sizeZ="${i#*=}"
+                shift # past argument=value
+                ;;
+            [xX]=*)
+                sizeX="${i#*=}"
+                shift # past argument=value
+                ;;
+            [yY]=*)
+                sizeY="${i#*=}"
+                shift # past argument=value
+                ;;
+            [zZ]=*)
+                sizeZ="${i#*=}"
+                shift # past argument=value
+                ;;
+            c=*|center=*)
+                center="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
     
     mlx_scale x="$sizeX" y="$sizeY" z="$sizeZ"
@@ -1348,51 +1345,50 @@ mlx_cylinder() {
     center="false"
     if [ -z "$fn" ]; then fn="32"; fi
     
-    for i in "$@"
-    do
-    case $i in
-        h=*|height=*)
-            height="${i#*=}"
-            shift # past argument=value
-            ;;
-        r=*|radius=*)
-            radius1="${i#*=}"
-            radius2="$radius1"
-            shift # past argument=value
-            ;;
-        r1=*|radius1=*)
-            radius1="${i#*=}"
-            shift # past argument=value
-            ;;
-        r2=*|radius2=*)
-            radius2="${i#*=}"
-            shift # past argument=value
-            ;;
-        d=*|diameter=*)
-            radius1=$(bc <<< "scale=10;(${i#*=} / 2)")
-            radius2="$radius1"
-            shift # past argument=value
-            ;;
-        d1=*|diameter1=*)
-            radius1=$(bc <<< "scale=10;(${i#*=} / 2)")
-            shift # past argument=value
-            ;;
-        d2=*|diameter2=*)
-            radius2=$(bc <<< "scale=10;(${i#*=} / 2)")
-            shift # past argument=value
-            ;;
-        c=*|center=*)
-            center="${i#*=}"
-            shift # past argument=value
-            ;;
-        fn=*)
-            fn="${i#*=}"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            h=*|height=*)
+                height="${i#*=}"
+                shift # past argument=value
+                ;;
+            r=*|radius=*)
+                radius1="${i#*=}"
+                radius2="$radius1"
+                shift # past argument=value
+                ;;
+            r1=*|radius1=*)
+                radius1="${i#*=}"
+                shift # past argument=value
+                ;;
+            r2=*|radius2=*)
+                radius2="${i#*=}"
+                shift # past argument=value
+                ;;
+            d=*|diameter=*)
+                radius1=$(bc <<< "scale=10;(${i#*=} / 2)")
+                radius2="$radius1"
+                shift # past argument=value
+                ;;
+            d1=*|diameter1=*)
+                radius1=$(bc <<< "scale=10;(${i#*=} / 2)")
+                shift # past argument=value
+                ;;
+            d2=*|diameter2=*)
+                radius2=$(bc <<< "scale=10;(${i#*=} / 2)")
+                shift # past argument=value
+                ;;
+            c=*|center=*)
+                center="${i#*=}"
+                shift # past argument=value
+                ;;
+            fn=*)
+                fn="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
     
     # cone is created centered with Y up
@@ -1423,21 +1419,20 @@ mlx_sphere() {
     subdiv="3"
     #if [ -z "$fn" ]; then fn="32"; fi
     
-    for i in "$@"
-    do
-    case $i in
-        r=*|radius=*)
-            radius="${i#*=}"
-            shift # past argument=value
-            ;;
-        subdiv=*)
-            subdiv="${i#*=}"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            r=*|radius=*)
+                radius="${i#*=}"
+                shift # past argument=value
+                ;;
+            subdiv=*)
+                subdiv="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
     
     echo "\
@@ -1457,21 +1452,20 @@ mlx_sphere_cap() {
     angle="60"
     subdiv="3"
     
-    for i in "$@"
-    do
-    case $i in
-        a=*|angle=*)
-            angle="${i#*=}"
-            shift # past argument=value
-            ;;
-        subdiv=*)
-            subdiv="${i#*=}"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            a=*|angle=*)
+                angle="${i#*=}"
+                shift # past argument=value
+                ;;
+            subdiv=*)
+                subdiv="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
 
     echo "\
@@ -1505,49 +1499,48 @@ mlx_torus() {
         fn_v="12"
     fi
 
-    for i in "$@"
-    do
-    case $i in
-        rh=*|radius_h=*)
-            radius_h="${i#*=}"
-            shift # past argument=value
-            ;;
-        rv=*|radius_v=*)
-            radius_v="${i#*=}"
-            shift # past argument=value
-            ;;
-        ID=*)
-            ID="${i#*=}"
-            if [ -n "$OD" ]; then
-                #radius_h=($ID+$OD)/4
-                radius_h=$(bc <<< "scale=10;(($ID+$OD)/4)")
-                #radius_v=$radius_h-$ID/2
-                radius_v=$(bc <<< "scale=10;($radius_h-$ID/2)")
-            fi            
-            shift # past argument=value
-            ;;
-        OD=*)
-            OD="${i#*=}"
-            if [ -n "$ID" ]; then
-                #radius_h=($ID+$OD)/4
-                radius_h=$(bc <<< "scale=10;(($ID+$OD)/4)")
-                #radius_v=$radius_h-$ID/2
-                radius_v=$(bc <<< "scale=10;($radius_h-$ID/2)")
-            fi 
-            shift # past argument=value
-            ;;
-        fn_h=*)
-            fn_h="${i#*=}"
-            shift # past argument=value
-            ;;
-        fn_v=*)
-            fn_v="${i#*=}"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            rh=*|radius_h=*)
+                radius_h="${i#*=}"
+                shift # past argument=value
+                ;;
+            rv=*|radius_v=*)
+                radius_v="${i#*=}"
+                shift # past argument=value
+                ;;
+            ID=*)
+                ID="${i#*=}"
+                if [ -n "$OD" ]; then
+                    #radius_h=($ID+$OD)/4
+                    radius_h=$(bc <<< "scale=10;(($ID+$OD)/4)")
+                    #radius_v=$radius_h-$ID/2
+                    radius_v=$(bc <<< "scale=10;($radius_h-$ID/2)")
+                fi            
+                shift # past argument=value
+                ;;
+            OD=*)
+                OD="${i#*=}"
+                if [ -n "$ID" ]; then
+                    #radius_h=($ID+$OD)/4
+                    radius_h=$(bc <<< "scale=10;(($ID+$OD)/4)")
+                    #radius_v=$radius_h-$ID/2
+                    radius_v=$(bc <<< "scale=10;($radius_h-$ID/2)")
+                fi 
+                shift # past argument=value
+                ;;
+            fn_h=*)
+                fn_h="${i#*=}"
+                shift # past argument=value
+                ;;
+            fn_v=*)
+                fn_v="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
 
     echo "\
@@ -1580,30 +1573,29 @@ mlx_square() { # 2D
     # "center" parameter does not actully center plane, not sure what it is doing. Set this to false, which places the plane in the -X,+Y quadrant.
     if [ -z "$mlx_square_center" ]; then mlx_square_center="false"; fi
     
-    for i in "$@"
-    do
-    case $i in
-        s=*|size=*)
-            sizeX="${i#*=}"
-            sizeY="${i#*=}"
-            shift # past argument=value
-            ;;
-        [xX]=*)
-            sizeX="${i#*=}"
-            shift # past argument=value
-            ;;
-        [yY]=*)
-            sizeY="${i#*=}"
-            shift # past argument=value
-            ;;
-        c=*|center=*)
-            center="${i#*=}"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            s=*|size=*)
+                sizeX="${i#*=}"
+                sizeY="${i#*=}"
+                shift # past argument=value
+                ;;
+            [xX]=*)
+                sizeX="${i#*=}"
+                shift # past argument=value
+                ;;
+            [yY]=*)
+                sizeY="${i#*=}"
+                shift # past argument=value
+                ;;
+            c=*|center=*)
+                center="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
     
     echo "\
@@ -1634,33 +1626,32 @@ mlx_circle() { #2D
     radius2="0" #"0.5"
     if [ -z "$fn" ]; then fn="32"; fi
     
-    for i in "$@"
-    do
-    case $i in
-        r=*|radius=*|r1=*|radius1=*)
-            radius1="${i#*=}"
-            shift # past argument=value
-            ;;
-        r2=*|radius2=*)
-            radius2="${i#*=}"
-            shift # past argument=value
-            ;;
-        d=*|diameter=*|d1=*|diameter1=*)
-            radius1=$(bc <<< "scale=10;(${i#*=} / 2)")
-            shift # past argument=value
-            ;;
-        d2=*|diameter2=*)
-            radius2=$(bc <<< "scale=10;(${i#*=} / 2)")
-            shift # past argument=value
-            ;;
-        fn=*)
-            fn="${i#*=}"
-            shift # past argument=value
-            ;;
-        *)
-            # unknown option
-            ;;
-    esac
+    for i in "$@"; do
+        case $i in
+            r=*|radius=*|r1=*|radius1=*)
+                radius1="${i#*=}"
+                shift # past argument=value
+                ;;
+            r2=*|radius2=*)
+                radius2="${i#*=}"
+                shift # past argument=value
+                ;;
+            d=*|diameter=*|d1=*|diameter1=*)
+                radius1=$(bc <<< "scale=10;(${i#*=} / 2)")
+                shift # past argument=value
+                ;;
+            d2=*|diameter2=*)
+                radius2=$(bc <<< "scale=10;(${i#*=} / 2)")
+                shift # past argument=value
+                ;;
+            fn=*)
+                fn="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
     done
     
     # Annulus is created centered on the XY plane
