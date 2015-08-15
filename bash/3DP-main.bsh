@@ -654,6 +654,7 @@ done
 do_simplify() {
     local return_code
     local faces
+    local half_F
     
     if [ -z "$m_color" ]; then  
         do_metadata "$1" # set m_scale
@@ -662,18 +663,21 @@ do_simplify() {
     do_measure_all "$1"
     
     avg_face_area=$(bc <<< "scale=10;($area_mm2/$num_F)")
+    avg_face_area_100=$(bc <<< "scale=10;($avg_face_area*100)")
+    half_F=$(bc <<< "scale=10;($num_f*0.5)")
     
     echo 
     echo "  Faces: $num_F" 
     #echo "  Surface Area (mm^2): "$(printf %.2f "$area_mm2") #"$area_mm2"
     echo "  Surface Area (cm^2): "$(printf %.2f "$area_cm2") #"$area_cm2"
     echo "  Average Face Area (mm^2): "$(printf %.4f "$avg_face_area")
+    echo "  Average Face Area (100 mm^2): "$(printf %.2f "$avg_face_area_100")
     echo ;
     echo "  Enter the target number of faces or hit enter to"
-    echo -n "accept the default (\"25000\"): "
+    echo -n "accept the default (50% of current: \"$half_F\"): "
     read faces
     if [ -z "$faces" ]; then
-        faces="25000"
+        faces="$half_F"
     fi
     
     # Set output file name

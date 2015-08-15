@@ -539,7 +539,7 @@ mlx_reorient_normals() {
 mlx_flip_normals() {
     local i
     local forceFlip # If true, the normals will always be flipped; otherwise, the filter tries to set them outside
-    local selected # If true, only selected faces will be affected
+    local selected # If true the filter affects only the selected faces.
     
     # Defaults
     forceFlip="false"
@@ -892,7 +892,7 @@ mlx_rotate() {
     local angle # Angle of rotation; from -360 to +360 degrees
     local customAxis # A vector defining the custom axis to rotate about. This rotation axis is used only if the "custom" axis option is used.
     local center # The center point to rotate about; can be origin, barycenter, or custom.
-    local customCenter # A vector defining the custom center to rotate about. This rotation center is used only if the "custom" center option is used.
+    local customCenter # A vector defining the custom center point to rotate about. This rotation center is used only if the "custom" center option is used.
     local freeze # The transformation is explicitly applied and the vertex coords are actually changed
     local allLayers # The transformation is explicitly applied to all the mesh and raster layers in the project
     
@@ -900,12 +900,12 @@ mlx_rotate() {
     axis=2 # Z axis
     angle="0"
     customAxis=( 0 0 1 )
-    center=0 # 0=origin
+    center=0 #0=origin, 1=barycenter, 2=custom
     customCenter=( 0 0 0 )
     freeze="true"
     allLayers="false"
     
-    # TODO: add center of mass as a center point option
+    # TODO: add center of mass as a center point option for rotate and scale
     
     for i in "$@"; do
         case $i in
@@ -1010,22 +1010,26 @@ write_rotate() {
 # Usage: scale=(1)|(X=(1) Y=(1) Z=(1))
 mlx_scale() {
     local i
-    local scaleX
-    local scaleY
-    local scaleZ
-    local uniform
+    local scaleX # amount to scale in X axis
+    local scaleY # amount to scale in Y axis
+    local scaleZ # amount to scale in Z axis
+    local uniform # If true an uniform scaling (the same for all three axes) is applied.
+    local center # The center point to scale about; can be origin, barycenter, or custom.
+    local customCenter # A vector defining the custom center point to scale about. This rotation center is used only if the "custom" center option is used.
+    local unit # If true the object is scaled to a box whose sides are at most 1 unit length
+    local freeze # The transformation is explicitly applied and the vertex coords are actually changed
+    local allLayers # The transformation is explicitly applied to all the mesh and raster layers in the project
     
     # Defaults
     scaleX=1
     scaleY=1
     scaleZ=1
     uniform="true"
-    
-    if [ -z "$mlx_scale_center" ]; then mlx_scale_center="0"; fi #0=origin, 1=barycenter, 2=custom
-    if [ -z "$mlx_scale_customCenter" ]; then mlx_scale_customCenter=( 0 0 0 ); fi
-    if [ -z "$mlx_scale_unit" ]; then mlx_scale_unit="false"; fi
-    if [ -z "$mlx_scale_Freeze" ]; then mlx_scale_Freeze="true"; fi
-    if [ -z "$mlx_scale_ToAll" ]; then mlx_scale_ToAll="false"; fi
+    center=0 #0=origin, 1=barycenter, 2=custom
+    customCenter=( 0 0 0 )
+    unit="false"
+    freeze="true"
+    allLayers="false"
     
     for i in "$@"; do
         case $i in
@@ -1033,6 +1037,7 @@ mlx_scale() {
                 scaleX="${i#*=}"
                 scaleY="${i#*=}"
                 scaleZ="${i#*=}"
+                uniform="true"
                 shift # past argument=value
                 ;;
             [xX]=*)
@@ -1050,6 +1055,48 @@ mlx_scale() {
                 uniform="false"
                 shift # past argument=value
                 ;;
+            center=*) # 0=origin, 1=barycenter, 2=custom
+                case "${i#*=}" in
+                    origin )
+                        center=0
+                        ;;
+                    barycenter )
+                        center=1
+                        ;;
+                    custom )
+                        center=2
+                        if [[ " ${customCenter[@]} " = " 0 0 0 " ]]; then
+                            echo ; echo "WARNING: a custom center point was selected, however \"customCenter=\" was not provided. Using default (origin) instead."
+                        fi
+                        ;;
+                    * )
+                        center=0
+                        ;;
+                esac
+                shift # past argument=value
+                ;;
+            custom[cC]enter=*)
+                OIFS="$IFS"; IFS=,; read -a customCenter <<< "${i#*=}"; IFS="$OIFS"
+                for ((j=0; j<${#customCenter[@]}; j++)); do
+                    if [ -z ${customCenter[$j]} ]; then customCenter[$j]=0; fi
+                    #echo "end j=\"${customCenter[$j]}\""
+                done
+                if [ ${#customCenter[@]} -eq 2 ]; then customCenter[2]=0; fi # sets z axis to 0 if left blank
+                #echo "customCenter = ( ${customCenter[@]} )"
+                shift # past argument=value
+                ;;
+            unit=*)
+                unit="${i#*=}"
+                shift # past argument=value
+                ;;
+            freeze=*)
+                freeze="${i#*=}"
+                shift # past argument=value
+                ;;
+            all[lL]ayers=*|all=*)
+                allLayers="${i#*=}"
+                shift # past argument=value
+                ;;
             *)
                 # unknown option
                 ;;
@@ -1062,20 +1109,35 @@ mlx_scale() {
         <Param name=\"axisY\" description=\"Y Axis\" value=\"$scaleY\" type=\"RichFloat\" tooltip=\"Scaling\"/>
         <Param name=\"axisZ\" description=\"Z Axis\" value=\"$scaleZ\" type=\"RichFloat\" tooltip=\"Scaling\"/>
         <Param name=\"uniformFlag\" description=\"Uniform Scaling\" value=\"$uniform\" type=\"RichBool\" tooltip=\"If selected an uniform scaling (the same for all the three axis) is applied (the X axis value is used)\"/>
-        <Param name=\"scaleCenter\" description=\"Center of scaling:\" value=\"$mlx_scale_center\" enum_val0=\"origin\" enum_val1=\"barycenter\" enum_val2=\"custom point\" enum_cardinality=\"3\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
-        <Param name=\"customCenter\" description=\"Custom center\" x=\"${mlx_scale_customCenter[0]}\" y=\"${mlx_scale_customCenter[1]}\" z=\"${mlx_scale_customCenter[2]}\" type=\"RichPoint3f\" tooltip=\"This scaling center is used only if the 'custom point' option is chosen.\"/>
-        <Param name=\"unitFlag\" description=\"Scale to Unit bbox\" value=\"$mlx_scale_unit\" type=\"RichBool\" tooltip=\"If selected, the object is scaled to a box whose sides are at most 1 unit length\"/>
-        <Param name=\"Freeze\" description=\"Freeze Matrix\" value=\"$mlx_scale_Freeze\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied and the vertex coords are actually changed\"/>
-        <Param name=\"ToAll\" description=\"Apply to all layers\" value=\"$mlx_scale_ToAll\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied to all the mesh and raster layers in the project\"/>
+        <Param name=\"scaleCenter\" description=\"Center of scaling:\" value=\"$center\" enum_val0=\"origin\" enum_val1=\"barycenter\" enum_val2=\"custom point\" enum_cardinality=\"3\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
+        <Param name=\"customCenter\" description=\"Custom center\" x=\"${customCenter[0]}\" y=\"${customCenter[1]}\" z=\"${customCenter[2]}\" type=\"RichPoint3f\" tooltip=\"This scaling center is used only if the 'custom point' option is chosen.\"/>
+        <Param name=\"unitFlag\" description=\"Scale to Unit bbox\" value=\"$unit\" type=\"RichBool\" tooltip=\"If selected, the object is scaled to a box whose sides are at most 1 unit length\"/>
+        <Param name=\"Freeze\" description=\"Freeze Matrix\" value=\"$freeze\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied and the vertex coords are actually changed\"/>
+        <Param name=\"ToAll\" description=\"Apply to all layers\" value=\"$allLayers\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied to all the mesh and raster layers in the project\"/>
     </filter>" >> "$ml_SF"
 }
 
 mlx_freeze_matrix() {
-    if [ -z "$mlx_freeze_matrix_allLayers" ]; then mlx_freeze_matrix_allLayers="false"; fi
+    local allLayers # The transformation is explicitly applied to all the mesh and raster layers in the project
+    
+    # Defaults
+    allLayers="false"
+    
+    for i in "$@"; do
+        case $i in
+            all[lL]ayers=*|all=*)
+                allLayers="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
+    done
 
     echo "\
     <filter name=\"Freeze Current Matrix\">
-        <Param name=\"allLayers\" description=\"Apply to all visible Layers\" value=\"$mlx_freeze_matrix_allLayers\" type=\"RichBool\" tooltip=\"If selected the filter will be applied to all visible layers\"/>
+        <Param name=\"allLayers\" description=\"Apply to all visible Layers\" value=\"$allLayers\" type=\"RichBool\" tooltip=\"If selected the filter will be applied to all visible layers\"/>
     </filter>" >> "$ml_SF"
 }
 
@@ -1088,24 +1150,95 @@ mlx_freeze_matrix() {
 # TIP: measure topology fist to find number of faces and area
 mlx_simplify() {
     local i
-    local faces
+    local faces # Target number of faces
+    local targetPerc # If non zero, this parameter specifies the desired final size of the mesh as a percentage of the initial mesh.
+    local qualityThr # Quality threshold for penalizing bad shaped faces. The value is in the range [0..1; 0 accept any kind of face (no penalties), 0.5  penalize faces with quality <0.5, proportionally to their shape.
+    local preserveBoundary # The simplification process tries not to destroy mesh boundaries
+    local boundaryWeight # The importance of the boundary during simplification. Default (1.0) means that the boundary has the same importance of the rest. Values greater than 1.0 raise boundary importance and has the effect of removing less vertices on the border. Admitted range of values (0,+inf).
+    local preserveNormal # Try to avoid face flipping effects and try to preserve the original orientation of the surface
+    local optimalPlacement # Each collapsed vertex is placed in the position minimizing the quadric error. It can fail (creating bad spikes) in case of very flat areas. If false edges are collapsed onto one of the two original vertices and the final mesh is composed by a subset of the original vertices.
+    local planarQuadric # Add additional simplification constraints that improves the quality of the simplification of the planar portion of the mesh.
+    local selected # If true the filter affects only the selected faces.
+    
+    # With texture
+    local extraTexCoordWeight # Additional weight for each extra Texture Coordinates for every (selected) vertex
+    
+    # Without texture
+    local preserveTopology # Avoid all the collapses that should cause a topology change in the mesh (like closing holes, squeezing handles, etc). If checked the genus of the mesh should stay unchanged.
+    local qualityWeight # Use the Per-Vertex quality as a weighting factor for the simplification. The weight is used as a error amplification value, so a vertex with a high quality value will not be simplified and a portion of the mesh with low quality values will be aggressively simplified.
+    local autoClean # After the simplification an additional set of steps is performed to clean the mesh (unreferenced vertices, bad faces, etc).
     
     # Defaults
     faces=25000
+    targetPerc="0"
+    qualityThr="0.3"
+    preserveBoundary="false"
+    boundaryWeight="1"
+    preserveNormal="false"
+    optimalPlacement="true"
+    planarQuadric="false"
+    selected="false"
     
-    if [ -z "$mlx_simplify_TargetPerc" ]; then mlx_simplify_TargetPerc="0"; fi
-    if [ -z "$mlx_simplify_QualityThr" ]; then mlx_simplify_QualityThr="0.3"; fi
-    if [ -z "$mlx_simplify_PreserveBoundary" ]; then mlx_simplify_PreserveBoundary="false"; fi
-    if [ -z "$mlx_simplify_BoundaryWeight" ]; then mlx_simplify_BoundaryWeight="1"; fi
-    if [ -z "$mlx_simplify_PreserveNormal" ]; then mlx_simplify_PreserveNormal="false"; fi
-    if [ -z "$mlx_simplify_OptimalPlacement" ]; then mlx_simplify_OptimalPlacement="true"; fi
-    if [ -z "$mlx_simplify_PlanarQuadric" ]; then mlx_simplify_PlanarQuadric="false"; fi
-    if [ -z "$mlx_simplify_Selected" ]; then mlx_simplify_Selected="false"; fi
+    # With texture
+    extraTexCoordWeight="1"
+    
+    # Without texture
+    preserveTopology="true"
+    qualityWeight="false"
+    autoClean="true"
     
     for i in "$@"; do
         case $i in
             [fF]=*|faces=*)
                 faces="${i#*=}"
+                shift # past argument=value
+                ;;
+            target[pP]erc=*)
+                targetPerc="${i#*=}"
+                shift # past argument=value
+                ;;
+            quality[tT]hr=*)
+                qualityThr="${i#*=}"
+                shift # past argument=value
+                ;;
+            preserve[bB]oundary=*)
+                preserveBoundary="${i#*=}"
+                shift # past argument=value
+                ;;
+            boundary[wW]eight=*)
+                boundaryWeight="${i#*=}"
+                shift # past argument=value
+                ;;
+            preserve[nN]ormal=*)
+                preserveNormal="${i#*=}"
+                shift # past argument=value
+                ;;
+            optimal[pP]lacement=*)
+                optimalPlacement="${i#*=}"
+                shift # past argument=value
+                ;;
+            planar[qQ]uadric=*)
+                planarQuadric="${i#*=}"
+                shift # past argument=value
+                ;;
+            sel=*|selected=*)
+                selected="${i#*=}"
+                shift # past argument=value
+                ;;
+            extra[tT]ex[cC]oord[wW]eight=*)
+                extraTexCoordWeight="${i#*=}"
+                shift # past argument=value
+                ;;
+            preserve[tT]opology=*)
+                preserveTopology="${i#*=}"
+                shift # past argument=value
+                ;;
+            quality[wW]eight=*)
+                qualityWeight="${i#*=}"
+                shift # past argument=value
+                ;;
+            auto[cC]lean=*)
+                autoClean="${i#*=}"
                 shift # past argument=value
                 ;;
             *)
@@ -1116,38 +1249,34 @@ mlx_simplify() {
     
     if [ -z "$m_color" ]; then set_m_color "$ml_IF"; fi # set m_color based on input file
     if [ "$m_color" = "UV" ]; then
-        if [ -z "$mlx_simplify_Extratcoordw" ]; then mlx_simplify_Extratcoordw="1"; fi
         echo "\
     <filter name=\"Quadric Edge Collapse Decimation (with texture)\">
         <Param name=\"TargetFaceNum\" description=\"Target number of faces\" value=\"$faces\" type=\"RichInt\" tooltip=\"\"/>
-        <Param name=\"TargetPerc\" description=\"Percentage reduction (0..1)\" value=\"$mlx_simplify_TargetPerc\" type=\"RichFloat\" tooltip=\"If non zero, this parameter specifies the desired final size of the mesh as a percentage of the initial mesh.\"/>
-        <Param name=\"QualityThr\" description=\"Quality threshold\" value=\"$mlx_simplify_QualityThr\" type=\"RichFloat\" tooltip=\"Quality threshold for penalizing bad shaped faces.&lt;br>The value is in the range [0..1]&#xa; 0 accept any kind of face (no penalties),&#xa; 0.5  penalize faces with quality &lt; 0.5, proportionally to their shape&#xa;\"/>
-        <Param name=\"Extratcoordw\" description=\"Texture Weight\" value=\"$mlx_simplify_Extratcoordw\" type=\"RichFloat\" tooltip=\"Additional weight for each extra Texture Coordinates for every (selected) vertex\"/>
-        <Param name=\"PreserveBoundary\" description=\"Preserve Boundary of the mesh\" value=\"$mlx_simplify_PreserveBoundary\" type=\"RichBool\" tooltip=\"The simplification process tries not to destroy mesh boundaries\"/>
-        <Param name=\"BoundaryWeight\" description=\"Boundary Preserving Weight\" value=\"$mlx_simplify_BoundaryWeight\" type=\"RichFloat\" tooltip=\"The importance of the boundary during simplification. Default (1.0) means that the boundary has the same importance of the rest. Values greater than 1.0 raise boundary importance and has the effect of removing less vertices on the border. Admitted range of values (0,+inf). \"/>
-        <Param name=\"OptimalPlacement\" description=\"Optimal position of simplified vertices\" value=\"$mlx_simplify_OptimalPlacement\" type=\"RichBool\" tooltip=\"Each collapsed vertex is placed in the position minimizing the quadric error.&#xa; It can fail (creating bad spikes) in case of very flat areas. &#xa;If disabled edges are collapsed onto one of the two original vertices and the final mesh is composed by a subset of the original vertices.\"/>
-        <Param name=\"PreserveNormal\" description=\"Preserve Normal\" value=\"$mlx_simplify_PreserveNormal\" type=\"RichBool\" tooltip=\"Try to avoid face flipping effects and try to preserve the original orientation of the surface\"/>
-        <Param name=\"PlanarQuadric\" description=\"Planar Simplification\" value=\"$mlx_simplify_PlanarQuadric\" type=\"RichBool\" tooltip=\"Add additional simplification constraints that improves the quality of the simplification of the planar portion of the mesh.\"/>
-        <Param name=\"Selected\" description=\"Simplify only selected faces\" value=\"$mlx_simplify_Selected\" type=\"RichBool\" tooltip=\"The simplification is applied only to the selected set of faces.&#xa; Take care of the target number of faces!\"/>
+        <Param name=\"TargetPerc\" description=\"Percentage reduction (0..1)\" value=\"$targetPerc\" type=\"RichFloat\" tooltip=\"If non zero, this parameter specifies the desired final size of the mesh as a percentage of the initial mesh.\"/>
+        <Param name=\"QualityThr\" description=\"Quality threshold\" value=\"$qualityThr\" type=\"RichFloat\" tooltip=\"Quality threshold for penalizing bad shaped faces.&lt;br>The value is in the range [0..1]&#xa; 0 accept any kind of face (no penalties),&#xa; 0.5  penalize faces with quality &lt; 0.5, proportionally to their shape&#xa;\"/>
+        <Param name=\"Extratcoordw\" description=\"Texture Weight\" value=\"$extraTexCoordWeight\" type=\"RichFloat\" tooltip=\"Additional weight for each extra Texture Coordinates for every (selected) vertex\"/>
+        <Param name=\"PreserveBoundary\" description=\"Preserve Boundary of the mesh\" value=\"$preserveBoundary\" type=\"RichBool\" tooltip=\"The simplification process tries not to destroy mesh boundaries\"/>
+        <Param name=\"BoundaryWeight\" description=\"Boundary Preserving Weight\" value=\"$boundaryWeight\" type=\"RichFloat\" tooltip=\"The importance of the boundary during simplification. Default (1.0) means that the boundary has the same importance of the rest. Values greater than 1.0 raise boundary importance and has the effect of removing less vertices on the border. Admitted range of values (0,+inf).\"/>
+        <Param name=\"OptimalPlacement\" description=\"Optimal position of simplified vertices\" value=\"$optimalPlacement\" type=\"RichBool\" tooltip=\"Each collapsed vertex is placed in the position minimizing the quadric error.&#xa; It can fail (creating bad spikes) in case of very flat areas. &#xa;If disabled edges are collapsed onto one of the two original vertices and the final mesh is composed by a subset of the original vertices.\"/>
+        <Param name=\"PreserveNormal\" description=\"Preserve Normal\" value=\"$preserveNormal\" type=\"RichBool\" tooltip=\"Try to avoid face flipping effects and try to preserve the original orientation of the surface\"/>
+        <Param name=\"PlanarQuadric\" description=\"Planar Simplification\" value=\"$planarQuadric\" type=\"RichBool\" tooltip=\"Add additional simplification constraints that improves the quality of the simplification of the planar portion of the mesh.\"/>
+        <Param name=\"Selected\" description=\"Simplify only selected faces\" value=\"$selected\" type=\"RichBool\" tooltip=\"The simplification is applied only to the selected set of faces.&#xa; Take care of the target number of faces!\"/>
     </filter>" >> "$ml_SF"
     else
-        if [ -z "$mlx_simplify_PreserveTopology" ]; then mlx_simplify_PreserveTopology="true"; fi
-        if [ -z "$mlx_simplify_QualityWeight" ]; then mlx_simplify_QualityWeight="false"; fi
-        if [ -z "$mlx_simplify_AutoClean" ]; then mlx_simplify_AutoClean="true"; fi
         echo "\
     <filter name=\"Quadric Edge Collapse Decimation\">
         <Param name=\"TargetFaceNum\" description=\"Target number of faces\" value=\"$faces\" type=\"RichInt\" tooltip=\"The desired final number of faces.\"/>
-        <Param name=\"TargetPerc\" description=\"Percentage reduction (0..1)\" value=\"$mlx_simplify_TargetPerc\" type=\"RichFloat\" tooltip=\"If non zero, this parameter specifies the desired final size of the mesh as a percentage of the initial size.\"/>
-        <Param name=\"QualityThr\" description=\"Quality threshold\" value=\"$mlx_simplify_QualityThr\" type=\"RichFloat\" tooltip=\"Quality threshold for penalizing bad shaped faces.&lt;br>The value is in the range [0..1]&#xa; 0 accept any kind of face (no penalties),&#xa; 0.5  penalize faces with quality &lt; 0.5, proportionally to their shape&#xa;\"/>
-        <Param name=\"PreserveBoundary\" description=\"Preserve Boundary of the mesh\" value=\"$mlx_simplify_PreserveBoundary\" type=\"RichBool\" tooltip=\"The simplification process tries to do not affect mesh boundaries during simplification\"/>
-        <Param name=\"BoundaryWeight\" description=\"Boundary Preserving Weight\" value=\"$mlx_simplify_BoundaryWeight\" type=\"RichFloat\" tooltip=\"The importance of the boundary during simplification. Default (1.0) means that the boundary has the same importance of the rest. Values greater than 1.0 raise boundary importance and has the effect of removing less vertices on the border. Admitted range of values (0,+inf).\"/>
-        <Param name=\"PreserveNormal\" description=\"Preserve Normal\" value=\"$mlx_simplify_PreserveNormal\" type=\"RichBool\" tooltip=\"Try to avoid face flipping effects and try to preserve the original orientation of the surface\"/>
-        <Param name=\"PreserveTopology\" description=\"Preserve Topology\" value=\"$mlx_simplify_PreserveTopology\" type=\"RichBool\" tooltip=\"Avoid all the collapses that should cause a topology change in the mesh (like closing holes, squeezing handles, etc). If checked the genus of the mesh should stay unchanged.\"/>
-        <Param name=\"OptimalPlacement\" description=\"Optimal position of simplified vertices\" value=\"$mlx_simplify_OptimalPlacement\" type=\"RichBool\" tooltip=\"Each collapsed vertex is placed in the position minimizing the quadric error.&#xa; It can fail (creating bad spikes) in case of very flat areas. &#xa;If disabled edges are collapsed onto one of the two original vertices and the final mesh is composed by a subset of the original vertices.\"/>
-        <Param name=\"PlanarQuadric\" description=\"Planar Simplification\" value=\"$mlx_simplify_PlanarQuadric\" type=\"RichBool\" tooltip=\"Add additional simplification constraints that improves the quality of the simplification of the planar portion of the mesh.\"/>
-        <Param name=\"QualityWeight\" description=\"Weighted Simplification\" value=\"$mlx_simplify_QualityWeight\" type=\"RichBool\" tooltip=\"Use the Per-Vertex quality as a weighting factor for the simplification. The weight is used as a error amplification value, so a vertex with a high quality value will not be simplified and a portion of the mesh with low quality values will be aggressively simplified.\"/>
-        <Param name=\"AutoClean\" description=\"Post-simplification cleaning\" value=\"$mlx_simplify_AutoClean\" type=\"RichBool\" tooltip=\"After the simplification an additional set of steps is performed to clean the mesh (unreferenced vertices, bad faces, etc)\"/>
-        <Param name=\"Selected\" description=\"Simplify only selected faces\" value=\"$mlx_simplify_Selected\" type=\"RichBool\" tooltip=\"The simplification is applied only to the selected set of faces.&#xa; Take care of the target number of faces!\"/>
+        <Param name=\"TargetPerc\" description=\"Percentage reduction (0..1)\" value=\"$targetPerc\" type=\"RichFloat\" tooltip=\"If non zero, this parameter specifies the desired final size of the mesh as a percentage of the initial size.\"/>
+        <Param name=\"QualityThr\" description=\"Quality threshold\" value=\"$qualityThr\" type=\"RichFloat\" tooltip=\"Quality threshold for penalizing bad shaped faces.&lt;br>The value is in the range [0..1]&#xa; 0 accept any kind of face (no penalties),&#xa; 0.5  penalize faces with quality &lt; 0.5, proportionally to their shape&#xa;\"/>
+        <Param name=\"PreserveBoundary\" description=\"Preserve Boundary of the mesh\" value=\"$preserveBoundary\" type=\"RichBool\" tooltip=\"The simplification process tries to do not affect mesh boundaries during simplification\"/>
+        <Param name=\"BoundaryWeight\" description=\"Boundary Preserving Weight\" value=\"$boundaryWeight\" type=\"RichFloat\" tooltip=\"The importance of the boundary during simplification. Default (1.0) means that the boundary has the same importance of the rest. Values greater than 1.0 raise boundary importance and has the effect of removing less vertices on the border. Admitted range of values (0,+inf).\"/>
+        <Param name=\"PreserveNormal\" description=\"Preserve Normal\" value=\"$preserveNormal\" type=\"RichBool\" tooltip=\"Try to avoid face flipping effects and try to preserve the original orientation of the surface\"/>
+        <Param name=\"PreserveTopology\" description=\"Preserve Topology\" value=\"$preserveTopology\" type=\"RichBool\" tooltip=\"Avoid all the collapses that should cause a topology change in the mesh (like closing holes, squeezing handles, etc). If checked the genus of the mesh should stay unchanged.\"/>
+        <Param name=\"OptimalPlacement\" description=\"Optimal position of simplified vertices\" value=\"$optimalPlacement\" type=\"RichBool\" tooltip=\"Each collapsed vertex is placed in the position minimizing the quadric error.&#xa; It can fail (creating bad spikes) in case of very flat areas. &#xa;If disabled edges are collapsed onto one of the two original vertices and the final mesh is composed by a subset of the original vertices.\"/>
+        <Param name=\"PlanarQuadric\" description=\"Planar Simplification\" value=\"$planarQuadric\" type=\"RichBool\" tooltip=\"Add additional simplification constraints that improves the quality of the simplification of the planar portion of the mesh.\"/>
+        <Param name=\"QualityWeight\" description=\"Weighted Simplification\" value=\"$qualityWeight\" type=\"RichBool\" tooltip=\"Use the Per-Vertex quality as a weighting factor for the simplification. The weight is used as a error amplification value, so a vertex with a high quality value will not be simplified and a portion of the mesh with low quality values will be aggressively simplified.\"/>
+        <Param name=\"AutoClean\" description=\"Post-simplification cleaning\" value=\"$autoClean\" type=\"RichBool\" tooltip=\"After the simplification an additional set of steps is performed to clean the mesh (unreferenced vertices, bad faces, etc)\"/>
+        <Param name=\"Selected\" description=\"Simplify only selected faces\" value=\"$selected\" type=\"RichBool\" tooltip=\"The simplification is applied only to the selected set of faces.&#xa; Take care of the target number of faces!\"/>
     </filter>" >> "$ml_SF"
     fi
 }
@@ -1162,11 +1291,15 @@ mlx_offset() {
     #   offset_CellSize=$(bc <<< "($BBdiag * 0.01 * $offset_precision)")
     
     local i
-    local voxel # voxel cell size for resampling
+    local voxel # Voxel cell size for resampling. Smaller cells give better precision at a higher computational cost. Remember that halving the cell size means that you build a volume 8 times larger.
     local delta # offset amount; negative values offset inwards (inset)
     local voxelMax
     local deltaMin
     local deltaMax
+    local merge_V # If true the mesh generated by MC will be cleaned by unifying vertices that are almost coincident.
+    local discretize # If true the position of the intersected edge of the marching cube grid is not computed by linear interpolation, but it is placed in fixed middle position. As a consequence the resampled object will look severely aliased by a stairstep appearance. Useful only for simulating the output of 3D printing devices.
+    local multisample # If true the distance field is more accurately compute by multisampling the volume (7 sample for each voxel). Much slower but less artifacts.
+    local thicken # If true, you have to choose a not zero Offset and a double surface is built around the original surface, inside and outside. Is useful to convert thin floating surfaces into solid, thick meshes.
     
     # Defaults
     voxel=1
@@ -1180,11 +1313,10 @@ mlx_offset() {
         deltaMin="100"
         deltaMax="100"
     fi
-
-    if [ -z "$mlx_offset_merge_V" ]; then mlx_offset_merge_V="true"; fi
-    if [ -z "$mlx_offset_discretize" ]; then mlx_offset_discretize="false"; fi
-    if [ -z "$mlx_offset_multisample" ]; then mlx_offset_multisample="false"; fi
-    if [ -z "$mlx_offset_absDist" ]; then mlx_offset_absDist="false"; fi
+    merge_V="true"
+    discretize="false"
+    multisample="false"
+    thicken="false"
     
     for i in "$@"; do
         case $i in
@@ -1194,6 +1326,22 @@ mlx_offset() {
                 ;;
             d=*|delta=*)
                 delta="${i#*=}"
+                shift # past argument=value
+                ;;
+            merge_V=*)
+                merge_V="${i#*=}"
+                shift # past argument=value
+                ;;
+            discretize=*)
+                discretize="${i#*=}"
+                shift # past argument=value
+                ;;
+            multisample=*)
+                multisample="${i#*=}"
+                shift # past argument=value
+                ;;
+            thicken=*)
+                thicken="${i#*=}"
                 shift # past argument=value
                 ;;
             *)
@@ -1206,29 +1354,56 @@ mlx_offset() {
     <filter name=\"Uniform Mesh Resampling\">
         <Param name=\"CellSize\" description=\"Precision\" value=\"$voxel\" min=\"0\" max=\"$voxelMax\" type=\"RichAbsPerc\" tooltip=\"Size of the cell, the default is 1/50 of the box diag. Smaller cells give better precision at a higher computational cost. Remember that halving the cell size means that you build a volume 8 times larger.\"/>
         <Param name=\"Offset\" description=\"Offset\" value=\"$delta\" min=\"$deltaMin\" max=\"$deltaMax\" type=\"RichAbsPerc\" tooltip=\"Offset of the created surface (i.e. distance of the created surface from the original one).&lt;br>If offset is zero, the created surface passes on the original mesh itself. Values greater than zero mean an external surface, and lower than zero mean an internal surface.&lt;br> In practice this value is the threshold passed to the Marching Cube algorithm to extract the isosurface from the distance field representation.\"/>
-        <Param name=\"mergeCloseVert\" description=\"Clean Vertices\" value=\"$mlx_offset_merge_V\" type=\"RichBool\" tooltip=\"If true the mesh generated by MC will be cleaned by unifying vertices that are almost coincident\"/>
-        <Param name=\"discretize\" description=\"Discretize\" value=\"$mlx_offset_discretize\" type=\"RichBool\" tooltip=\"If true the position of the intersected edge of the marching cube grid is not computed by linear interpolation, but it is placed in fixed middle position. As a consequence the resampled object will look severely aliased by a stairstep appearance.&lt;br>Useful only for simulating the output of 3D printing devices.\"/>
-        <Param name=\"multisample\" description=\"Multisample\" value=\"$mlx_offset_multisample\" type=\"RichBool\" tooltip=\"If true the distance field is more accurately compute by multisampling the volume (7 sample for each voxel). Much slower but less artifacts.\"/>
-        <Param name=\"absDist\" description=\"Absolute Distance\" value=\"$mlx_offset_absDist\" type=\"RichBool\" tooltip=\"If true a &lt;b> not&lt;/b> signed distance field is computed. In this case you have to choose a not zero Offset and a double surface is built around the original surface, inside and outside. Is useful to convert thin floating surfaces into &lt;i> solid, thick meshes.&lt;/i>.\"/>
+        <Param name=\"mergeCloseVert\" description=\"Clean Vertices\" value=\"$merge_V\" type=\"RichBool\" tooltip=\"If true the mesh generated by MC will be cleaned by unifying vertices that are almost coincident\"/>
+        <Param name=\"discretize\" description=\"Discretize\" value=\"$discretize\" type=\"RichBool\" tooltip=\"If true the position of the intersected edge of the marching cube grid is not computed by linear interpolation, but it is placed in fixed middle position. As a consequence the resampled object will look severely aliased by a stairstep appearance.&lt;br>Useful only for simulating the output of 3D printing devices.\"/>
+        <Param name=\"multisample\" description=\"Multisample\" value=\"$multisample\" type=\"RichBool\" tooltip=\"If true the distance field is more accurately compute by multisampling the volume (7 sample for each voxel). Much slower but less artifacts.\"/>
+        <Param name=\"absDist\" description=\"Absolute Distance\" value=\"$thicken\" type=\"RichBool\" tooltip=\"If true a &lt;b> not&lt;/b> signed distance field is computed. In this case you have to choose a not zero Offset and a double surface is built around the original surface, inside and outside. Is useful to convert thin floating surfaces into &lt;i> solid, thick meshes.&lt;/i>.\"/>
     </filter>" >> "$ml_SF"
 }
 
 # Usage: iterations=(1)
 mlx_subdivide() {
     local i
-    local iterations
+    local iterations # Number of times the model is subdivided.
+    local loopWeight # Change the weighting scheme used; optimize some behaviors in spite of others. Values: loop, enhanceRegularity, enhanceContinuity
+    local E_threshold # Edge threshold: all the edges longer than this threshold will be refined. Setting this value to zero will force an uniform refinement.
+    local selected # If true the filter affects only the selected faces.
     
     # Defaults
     iterations="1"
-    
-    if [ -z "$mlx_subdivide_LoopWeight" ]; then mlx_subdivide_LoopWeight="0"; fi
-    if [ -z "$mlx_subdivide_Threshold" ]; then mlx_subdivide_Threshold="0"; fi
-    if [ -z "$mlx_subdivide_Selected" ]; then mlx_subdivide_Selected="false"; fi
+    loopWeight="0" # 0=loop, 1=enhanceRegularity, 2=enhanceContinuity
+    E_threshold="0"
+    selected="false"
     
     for i in "$@"; do
         case $i in
             [iI]=*|[iI]terations=*)
                 iterations="${i#*=}"
+                shift # past argument=value
+                ;;
+            loop[wW]eight=*) # 0=loop, 1=enhanceRegularity, 2=enhanceContinuity
+                case "${i#*=}" in
+                    loop )
+                        loopWeight=0
+                        ;;
+                    enhance[rR]egularity )
+                        loopWeight=1
+                        ;;
+                    enhance[cC]ontinuity )
+                        loopWeight=2
+                        ;;
+                    * )
+                        loopWeight=0
+                        ;;
+                esac
+                shift # past argument=value
+                ;;
+            E_threshold=*)
+                E_threshold="${i#*=}"
+                shift # past argument=value
+                ;;
+            sel=*|selected=*)
+                selected="${i#*=}"
                 shift # past argument=value
                 ;;
             *)
@@ -1239,24 +1414,26 @@ mlx_subdivide() {
     
     echo "\
     <filter name=\"Subdivision Surfaces: Loop\">
-        <Param name=\"LoopWeight\" description=\"Weighting scheme\" value=\"$mlx_subdivide_LoopWeight\" enum_val0=\"Loop\" enum_val1=\"Enhance regularity\" enum_val2=\"Enhance continuity\" enum_cardinality=\"3\" type=\"RichEnum\" tooltip=\"Change the weights used. Allow to optimize some behaviours in spite of others.\"/>
+        <Param name=\"LoopWeight\" description=\"Weighting scheme\" value=\"$loopWeight\" enum_val0=\"Loop\" enum_val1=\"Enhance regularity\" enum_val2=\"Enhance continuity\" enum_cardinality=\"3\" type=\"RichEnum\" tooltip=\"Change the weights used. Allow to optimize some behaviours in spite of others.\"/>
         <Param name=\"Iterations\" description=\"Iterations\" value=\"$iterations\" type=\"RichInt\" tooltip=\"Number of times the model is subdivided.\"/>
-        <Param name=\"Threshold\" description=\"Edge Threshold\" value=\"$mlx_subdivide_Threshold\" min=\"0\" max=\"100\" type=\"RichAbsPerc\" tooltip=\"All the edges &lt;b>longer&lt;/b> than this threshold will be refined.&lt;br>Setting this value to zero will force an uniform refinement.\"/>
-        <Param name=\"Selected\" description=\"Affect only selected faces\" value=\"$mlx_subdivide_Selected\" type=\"RichBool\" tooltip=\"If selected the filter affect only the selected faces\"/>
+        <Param name=\"Threshold\" description=\"Edge Threshold\" value=\"$E_threshold\" min=\"0\" max=\"100\" type=\"RichAbsPerc\" tooltip=\"All the edges &lt;b>longer&lt;/b> than this threshold will be refined.&lt;br>Setting this value to zero will force an uniform refinement.\"/>
+        <Param name=\"Selected\" description=\"Affect only selected faces\" value=\"$selected\" type=\"RichBool\" tooltip=\"If selected the filter affect only the selected faces\"/>
     </filter>" >> "$ml_SF"
 }
 
 # Usage: iterations=(1)
 mlx_smooth() {
     local i
-    local iterations
+    local iterations # The number of times that the whole algorithm (normal smoothing + vertex fitting) is iterated.
+    local boundary # If true the boundary edges are smoothed only by themselves (e.g. the polyline forming the boundary of the mesh is independently smoothed). Can reduce the shrinking on the border but can have strange effects on very small boundaries.
+    local cotangentWeight # Cotangent weighting: if true the cotangent weighting scheme is computed for the averaging of the position. Otherwise (false) the simpler umbrella scheme (1 if the edge is present) is used.
+    local selected # If true the filter affects only the selected faces.
     
     # Defaults
     iterations="1"
-    
-    if [ -z "$mlx_smooth_Boundary" ]; then mlx_smooth_Boundary="true"; fi
-    if [ -z "$mlx_smooth_cotangentWeight" ]; then mlx_smooth_cotangentWeight="true"; fi
-    if [ -z "$mlx_smooth_Selected" ]; then mlx_smooth_Selected="false"; fi
+    boundary="true"
+    cotangentWeight="true"
+    selected="false"
     
     for i in "$@"; do
         case $i in
@@ -1264,6 +1441,17 @@ mlx_smooth() {
                 iterations="${i#*=}"
                 shift # past argument=value
                 ;;
+            boundary=*)
+                boundary="${i#*=}"
+                shift # past argument=value
+                ;;
+            cotangent[wW]eight=*)
+                cotangentWeight="${i#*=}"
+                shift # past argument=value
+                ;;
+            sel=*|selected=*)
+                selected="${i#*=}"
+                shift # past argument=value
             *)
                 # unknown option
                 ;;
@@ -1273,18 +1461,33 @@ mlx_smooth() {
     echo "\
     <filter name=\"Laplacian Smooth\">
         <Param name=\"stepSmoothNum\" description=\"Smoothing steps\" value=\"$iterations\" type=\"RichInt\" tooltip=\"The number of times that the whole algorithm (normal smoothing + vertex fitting) is iterated.\"/>
-        <Param name=\"Boundary\" description=\"1D Boundary Smoothing\" value=\"$mlx_smooth_Boundary\" type=\"RichBool\" tooltip=\"If true the boundary edges are smoothed only by themselves (e.g. the polyline forming the boundary of the mesh is independently smoothed). Can reduce the shrinking on the border but can have strange effects on very small boundaries.\"/>
-        <Param name=\"cotangentWeight\" description=\"Cotangent weighting\" value=\"$mlx_smooth_cotangentWeight\" type=\"RichBool\" tooltip=\"If true the cotangent weighting scheme is computed for the averaging of the position. Otherwise (false) the simpler umbrella scheme (1 if the edge is present) is used.\"/>
-        <Param name=\"Selected\" description=\"Affect only selected faces\" value=\"$mlx_smooth_Selected\" type=\"RichBool\" tooltip=\"If checked the filter is performed only on the selected faces\"/>
+        <Param name=\"Boundary\" description=\"1D Boundary Smoothing\" value=\"$boundary\" type=\"RichBool\" tooltip=\"If true the boundary edges are smoothed only by themselves (e.g. the polyline forming the boundary of the mesh is independently smoothed). Can reduce the shrinking on the border but can have strange effects on very small boundaries.\"/>
+        <Param name=\"cotangentWeight\" description=\"Cotangent weighting\" value=\"$cotangentWeight\" type=\"RichBool\" tooltip=\"If true the cotangent weighting scheme is computed for the averaging of the position. Otherwise (false) the simpler umbrella scheme (1 if the edge is present) is used.\"/>
+        <Param name=\"Selected\" description=\"Affect only selected faces\" value=\"$selected\" type=\"RichBool\" tooltip=\"If checked the filter is performed only on the selected faces\"/>
     </filter>" >> "$ml_SF"
 }
 
 mlx_hull() {
-    if [ -z "$mlx_hull_reorient" ]; then mlx_hull_reorient="true"; fi
+    local reorient_normals # Re-orient all faces coherently after hull operation.
+    
+    # Defaults
+    reorient_normals="true"
+    
+    for i in "$@"; do
+        case $i in
+            reorient=*|reorient_normals=*)
+                reorient_normals="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
+    done
 
     echo "\
     <filter name=\"Convex Hull\">
-        <Param name=\"reorient\" description=\"Re-orient all faces coherentely\" value=\"$mlx_hull_reorient\" type=\"RichBool\" tooltip=\"Re-orient all faces coherentely\"/>
+        <Param name=\"reorient\" description=\"Re-orient all faces coherentely\" value=\"$reorient_normals\" type=\"RichBool\" tooltip=\"Re-orient all faces coherentely\"/>
     </filter>" >> "$ml_SF"
 }
 
@@ -1298,19 +1501,33 @@ mlx_hull() {
 #mlx_flatten_layers_merge_V looks to be a key one; experiment with this
 mlx_flatten_layers() {
     local i
-    local merge_V
+    local merge_V # Merge the vertices that are duplicated among different layers. &lt;br>Very useful when the layers are spliced portions of a single big mesh.
+    local keepUnreferenced_V # Keep unreferenced vertices; if true do not discard unreferenced vertices from source layers. Necessary for point-only layers.
+    local mergeVisible # Merge only visible layers.
+    local delLayer # Delete all the merged layers. &lt;br>If all layers are visible only a single layer will remain after the invocation of this filter
     
     # Defaults
     merge_V="false"
-
-    if [ -z "$mlx_flatten_layers_MergeVisible" ]; then mlx_flatten_layers_MergeVisible="true"; fi
-    if [ -z "$mlx_flatten_layers_del_Layer" ]; then mlx_flatten_layers_del_Layer="true"; fi
-    if [ -z "$mlx_flatten_layers_Keep_Unreferenced_V" ]; then mlx_flatten_layers_Keep_Unreferenced_V="false"; fi
+    keepUnreferenced_V="false"
+    mergeVisible="true"
+    delLayer="true"
     
     for i in "$@"; do
         case $i in
             merge_V=*)
                 merge_V="${i#*=}"
+                shift # past argument=value
+                ;;
+            keep[uU]nreferenced_V=*)
+                keepUnreferenced_V="${i#*=}"
+                shift # past argument=value
+                ;;
+            merge[vV]isible=*)
+                mergeVisible="${i#*=}"
+                shift # past argument=value
+                ;;
+            del[lL]ayer=*)
+                delLayer="${i#*=}"
                 shift # past argument=value
                 ;;
             *)
@@ -1321,10 +1538,10 @@ mlx_flatten_layers() {
 
     echo "\
     <filter name=\"Flatten Visible Layers\">
-        <Param name=\"MergeVisible\" description=\"Merge Only Visible Layers\" value=\"$mlx_flatten_layers_MergeVisible\" type=\"RichBool\" tooltip=\"Merge the vertices that are duplicated among different layers. &lt;br>Very useful when the layers are spliced portions of a single big mesh.\"/>
-        <Param name=\"DeleteLayer\" description=\"Delete Layers \" value=\"$mlx_flatten_layers_del_Layer\" type=\"RichBool\" tooltip=\"Delete all the merged layers. &lt;br>If all layers are visible only a single layer will remain after the invocation of this filter\"/>
+        <Param name=\"MergeVisible\" description=\"Merge Only Visible Layers\" value=\"$mergeVisible\" type=\"RichBool\" tooltip=\"Merge the vertices that are duplicated among different layers. &lt;br>Very useful when the layers are spliced portions of a single big mesh.\"/>
+        <Param name=\"DeleteLayer\" description=\"Delete Layers \" value=\"$delLayer\" type=\"RichBool\" tooltip=\"Delete all the merged layers. &lt;br>If all layers are visible only a single layer will remain after the invocation of this filter\"/>
         <Param name=\"MergeVertices\" description=\"Merge duplicate vertices\" value=\"$merge_V\" type=\"RichBool\" tooltip=\"Merge the vertices that are duplicated among different layers. &#xa;&#xa;Very useful when the layers are spliced portions of a single big mesh.\"/>
-        <Param name=\"AlsoUnreferenced\" description=\"Keep unreferenced vertices\" value=\"$mlx_flatten_layers_Keep_Unreferenced_V\" type=\"RichBool\" tooltip=\"Do not discard unreferenced vertices from source layers&#xa;&#xa;Necessary for point-only layers\"/>
+        <Param name=\"AlsoUnreferenced\" description=\"Keep unreferenced vertices\" value=\"$keepUnreferenced_V\" type=\"RichBool\" tooltip=\"Do not discard unreferenced vertices from source layers&#xa;&#xa;Necessary for point-only layers\"/>
     </filter>" >> "$ml_SF"
 }
 
@@ -1487,29 +1704,29 @@ mlx_cylinder() {
                 height="${i#*=}"
                 shift # past argument=value
                 ;;
-            r=*|radius=*)
+            r=*|radius=*|rad=*)
                 radius1="${i#*=}"
                 radius2="$radius1"
                 shift # past argument=value
                 ;;
-            r1=*|radius1=*)
+            r1=*|radius1=*|rad1=*)
                 radius1="${i#*=}"
                 shift # past argument=value
                 ;;
-            r2=*|radius2=*)
+            r2=*|radius2=*|rad2=*)
                 radius2="${i#*=}"
                 shift # past argument=value
                 ;;
-            d=*|diameter=*)
+            d=*|diameter=*|dia=*)
                 radius1=$(bc <<< "scale=10;(${i#*=} / 2)")
                 radius2="$radius1"
                 shift # past argument=value
                 ;;
-            d1=*|diameter1=*)
+            d1=*|diameter1=*|dia1=*)
                 radius1=$(bc <<< "scale=10;(${i#*=} / 2)")
                 shift # past argument=value
                 ;;
-            d2=*|diameter2=*)
+            d2=*|diameter2=*|dia2=*)
                 radius2=$(bc <<< "scale=10;(${i#*=} / 2)")
                 shift # past argument=value
                 ;;
@@ -1557,7 +1774,7 @@ mlx_sphere() {
     
     for i in "$@"; do
         case $i in
-            r=*|radius=*)
+            r=*|radius=*|rad=*)
                 radius="${i#*=}"
                 shift # past argument=value
                 ;;
@@ -1583,6 +1800,7 @@ mlx_sphere_cap() {
     local i
     local angle # Angle of the cone subtending the cap. It must be <180
     local subdiv # Subdivision level; Number of the recursive subdivision of the surface. Default is 3 (a sphere approximation composed by 1280 faces). Admitted values are in the range 0 (an icosahedron) to 8 (a 1.3 MegaTris approximation of a sphere).
+    # F=20*4^subdiv
     
     # Defaults
     angle="60"
@@ -1637,15 +1855,15 @@ mlx_torus() {
 
     for i in "$@"; do
         case $i in
-            rh=*|radius_h=*)
+            rh=*|radius_h=*|rad_h=*)
                 radius_h="${i#*=}"
                 shift # past argument=value
                 ;;
-            rv=*|radius_v=*)
+            rv=*|radius_v=*|rad_v=*)
                 radius_v="${i#*=}"
                 shift # past argument=value
                 ;;
-            ID=*)
+            ID=*|inner[dD]iameter=*)
                 ID="${i#*=}"
                 if [ -n "$OD" ]; then
                     #radius_h=($ID+$OD)/4
@@ -1655,7 +1873,7 @@ mlx_torus() {
                 fi            
                 shift # past argument=value
                 ;;
-            OD=*)
+            OD=*|outer[dD]iameter=*)
                 OD="${i#*=}"
                 if [ -n "$ID" ]; then
                     #radius_h=($ID+$OD)/4
@@ -1764,7 +1982,7 @@ mlx_circle() { #2D
     
     for i in "$@"; do
         case $i in
-            r=*|radius=*|r1=*|radius1=*)
+            r=*|radius=*|rad=*|r1=*|radius1=*|rad1=*)
                 radius1="${i#*=}"
                 shift # past argument=value
                 ;;
@@ -1772,11 +1990,11 @@ mlx_circle() { #2D
                 radius2="${i#*=}"
                 shift # past argument=value
                 ;;
-            d=*|diameter=*|d1=*|diameter1=*)
+            d=*|diameter=*|dia=*|d1=*|diameter1=*|dia1=*)
                 radius1=$(bc <<< "scale=10;(${i#*=} / 2)")
                 shift # past argument=value
                 ;;
-            d2=*|diameter2=*)
+            d2=*|diameter2=*|dia2=*)
                 radius2=$(bc <<< "scale=10;(${i#*=} / 2)")
                 shift # past argument=value
                 ;;
