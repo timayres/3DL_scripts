@@ -14,10 +14,10 @@
 
 # TODO: add some error checking of input
 
-# TODO: write script to split model into individual components
-# could use sel_small_components with .99, then invert select to delete the largest object, & iterate.
-# 1-delete small components to get largest volume; save
-# 2-select small components, invert sel & del largest component. Go to 1.
+# TODO: write script to split model into individual parts
+# could use sel_small_parts with .99, then invert select to delete the largest object, & iterate.
+# 1-delete small parts to get largest volume; save
+# 2-select small parts, invert sel & del largest part. Go to 1.
 
 
 ###Initialize variables for run_meshlab
@@ -352,14 +352,14 @@ mlx_section() {
     local axis # The slicing plane is perpendicular to this axis (default Z)
     local offset # cross-plane offset (default 0)
     local surface # false (default) will create a 2D surface, otherwise will create a 1D outline composed of line segments (not a continuous polyline but individual segments)
-    local customaxis # custom axis (vector)
+    local customAxis # custom axis (vector)
     local planeref #the reference from which the planes are shifted
     
     # Defaults
     axis=2 # Z axis
     offset=0
     surface="false"
-    customaxis=( 0 0 1 )
+    customAxis=( 0 0 1 )
     planeref=2 #0=BB Center, 1=BB Min, 2=Origin
     
     for i in "$@"; do
@@ -388,14 +388,14 @@ mlx_section() {
                 surface="${i#*=}"
                 shift # past argument=value
                 ;;
-            customaxis=*)
-                OIFS="$IFS"; IFS=,; read -a customaxis <<< "${i#*=}"; IFS="$OIFS"
-                for j in "${customaxis[@]}"; do
+            custom[aA]xis=*)
+                OIFS="$IFS"; IFS=,; read -a customAxis <<< "${i#*=}"; IFS="$OIFS"
+                for j in "${customAxis[@]}"; do
                     #echo "j=\"$j\""
-                    if [ -z "$j" ]; then customaxis[j]=0; fi
+                    if [ -z "$j" ]; then customAxis[j]=0; fi
                 done
-                if [ ${#customaxis[@]} -eq 2 ]; then customaxis[2]=0; fi # sets z axis to 0 if left blank
-                #echo "customaxis = ( ${customaxis[@]} )"
+                if [ ${#customAxis[@]} -eq 2 ]; then customAxis[2]=0; fi # sets z axis to 0 if left blank
+                #echo "customAxis = ( ${customAxis[@]} )"
                 shift # past argument=value
                 ;;
             planeref=*)
@@ -408,14 +408,14 @@ mlx_section() {
         esac
     done
     
-    if [ "$axis" -eq 3 ] && [[ " ${customaxis[@]} " = " 0 0 1 " ]]; then
-        echo ; echo "WARNING: a custom axis was selected, however \"customaxis=\" was not provided. Using default (Z) instead."
+    if [ "$axis" -eq 3 ] && [[ " ${customAxis[@]} " = " 0 0 1 " ]]; then
+        echo ; echo "WARNING: a custom axis was selected, however \"customAxis=\" was not provided. Using default (Z) instead."
     fi
     
     echo "\
     <filter name=\"Compute Planar Section\">
         <Param name=\"planeAxis\" description=\"Plane perpendicular to\" value=\"$axis\" enum_val0=\"X Axis\" enum_val1=\"Y Axis\" enum_val2=\"Z Axis\" enum_val3=\"Custom Axis\" enum_cardinality=\"4\" type=\"RichEnum\" tooltip=\"The Slicing plane will be done perpendicular to the axis\"/>
-        <Param name=\"customAxis\" description=\"Custom axis\" x=\"${customaxis[0]}\" y=\"${customaxis[1]}\" z=\"${customaxis[2]}\" type=\"RichPoint3f\" tooltip=\"Specify a custom axis, this is only valid if the above parameter is set to Custom\"/>
+        <Param name=\"customAxis\" description=\"Custom axis\" x=\"${customAxis[0]}\" y=\"${customAxis[1]}\" z=\"${customAxis[2]}\" type=\"RichPoint3f\" tooltip=\"Specify a custom axis, this is only valid if the above parameter is set to Custom\"/>
         <Param name=\"planeOffset\" description=\"Cross plane offset\" value=\"$offset\" type=\"RichFloat\" tooltip=\"Specify an offset of the cross-plane. The offset corresponds to the distance from the point specified in the plane reference parameter. By default (Cross plane offset == 0)\"/>
         <Param name=\"relativeTo\" description=\"plane reference\" value=\"$planeref\" enum_val0=\"Bounding box center\" enum_val1=\"Bounding box min\" enum_val2=\"Origin\" enum_cardinality=\"3\" type=\"RichEnum\" tooltip=\"Specify the reference from which the planes are shifted\"/>
         <Param name=\"createSectionSurface\" description=\"Create also section surface\" value=\"$surface\" type=\"RichBool\" tooltip=\"If selected, in addition to a layer with the section polyline, it will be created also a layer with a triangulated version of the section polyline. This only works if the section polyline is closed\"/>
@@ -483,7 +483,7 @@ mlx_close_holes() {
                 selected="${i#*=}"
                 shift # past argument=value
                 ;;
-            selnewF=*|selnewf=*)
+            selnew[fF]=*)
                 selnewF="${i#*=}"
                 shift # past argument=value
                 ;;
@@ -516,7 +516,7 @@ mlx_grow_holes() {
     
     for i in "$@"; do
         case $i in
-            i=*|iterations=*)
+            [iI]=*|[iI]terations=*)
                 iterations="${i#*=}"
                 shift # past argument=value
                 ;;
@@ -547,7 +547,7 @@ mlx_flip_normals() {
     
     for i in "$@"; do
         case $i in
-            forceFlip=*|forceflip=*)
+            force[fF]lip=*|[fF][fF]=*)
                 forceFlip="${i#*=}"
                 shift # past argument=value
                 ;;
@@ -586,7 +586,7 @@ mlx_split_V_on_nonmanifold_F() {
     
     for i in "$@"; do
         case $i in
-            VDispRatio=*|vdispratio=*)
+            [vV][dD]isp[rR]atio=*|[vV][dD][rR]=*)
                 VDispRatio="${i#*=}"
                 shift # past argument=value
                 ;;
@@ -608,24 +608,66 @@ mlx_split_V_on_nonmanifold_F() {
 ### Begin Selection & Deletion ###
 
 mlx_sel_none() {
-    if [ -z "$mlx_select_none_allFaces" ]; then mlx_select_none_allFaces="true"; fi
-    if [ -z "$mlx_select_none_allVerts" ]; then mlx_select_none_allVerts="true"; fi
-
+    local i
+    local allF # If true the filter will de-select all the faces.
+    local allV # If true the filter will de-select all the vertices.
+    
+    # Defaults
+    allF="true"
+    allV="true"
+    
+    for i in "$@"; do
+        case $i in
+            all[fF]=*|[fF]=*|[fF]aces=*)
+                allF="${i#*=}"
+                shift # past argument=value
+                ;;
+            all[vV]=*|[vV]=*|[vV]ertexes=*|[vV]ertices=*)
+                allV="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
+    done
+    
     echo "\
     <filter name=\"Select None\">
-        <Param name=\"allFaces\" description=\"De-select all Faces\" value=\"$mlx_select_none_allFaces\" type=\"RichBool\" tooltip=\"If true the filter will de-select all the faces.\"/>
-        <Param name=\"allVerts\" description=\"De-select all Vertices\" value=\"$mlx_select_none_allVerts\" type=\"RichBool\" tooltip=\"If true the filter will de-select all the vertices.\"/>
+        <Param name=\"allFaces\" description=\"De-select all Faces\" value=\"$allF\" type=\"RichBool\" tooltip=\"If true the filter will de-select all the faces.\"/>
+        <Param name=\"allVerts\" description=\"De-select all Vertices\" value=\"$allV\" type=\"RichBool\" tooltip=\"If true the filter will de-select all the vertices.\"/>
     </filter>" >> "$ml_SF"
 }
 
 mlx_invert_sel() {
-    if [ -z "$mlx_invert_sel_InvFaces" ]; then mlx_invert_sel_InvFaces="true"; fi
-    if [ -z "$mlx_invert_sel_InvVerts" ]; then mlx_invert_sel_InvVerts="true"; fi
+    local i
+    local invF # If true the filter will de-select all the faces.
+    local invV # If true the filter will de-select all the vertices.
+    
+    # Defaults
+    invF="true"
+    invV="true"
+    
+    for i in "$@"; do
+        case $i in
+            inv[fF]=*|[fF]=*|[fF]aces=*)
+                invF="${i#*=}"
+                shift # past argument=value
+                ;;
+            inv[vV]=*|[vV]=*|[vV]ertexes=*|[vV]ertices=*)
+                invV="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
+    done
 
     echo "\
     <filter name=\"Invert Selection\">
-        <Param name=\"InvFaces\" description=\"Invert Faces\" value=\"$mlx_invert_sel_InvFaces\" type=\"RichBool\" tooltip=\"If true  the filter will invert the selected faces.\"/>
-        <Param name=\"InvVerts\" description=\"Invert Vertices\" value=\"$mlx_invert_sel_InvVerts\" type=\"RichBool\" tooltip=\"If true the filter will invert the selected vertices.\"/>
+        <Param name=\"InvFaces\" description=\"Invert Faces\" value=\"$invF\" type=\"RichBool\" tooltip=\"If true  the filter will invert the selected faces.\"/>
+        <Param name=\"InvVerts\" description=\"Invert Vertices\" value=\"$invV\" type=\"RichBool\" tooltip=\"If true the filter will invert the selected vertices.\"/>
     </filter>" >> "$ml_SF"
 }
 
@@ -645,7 +687,7 @@ mlx_grow_sel() {
     
     for i in "$@"; do
         case $i in
-            i=*|iterations=*)
+            [iI]=*|[iI]terations=*)
                 iterations="${i#*=}"
                 shift # past argument=value
                 ;;
@@ -673,7 +715,7 @@ mlx_shrink_sel() {
     
     for i in "$@"; do
     case $i in
-        i=*|iterations=*)
+        [iI]=*|[iI]terations=*)
             iterations="${i#*=}"
             shift # past argument=value
             ;;
@@ -715,19 +757,23 @@ mlx_del_nonmanifold_E() {
 }
 
 # Usage: ratio=(0.2)
-mlx_sel_small_components() {
+mlx_sel_small_parts() {
     local i
-    local ratio # Small component ratio, this ratio (between 0 and 1) defines the meaning of "small" as the threshold ratio between the number of faces of the largest component and the other ones. A larger value will select more components. (default 0.2)
+    local ratio # Small part ratio, this ratio (between 0 and 1) defines the meaning of "small" as the threshold ratio between the number of faces of the largest part and the other ones. A larger value will select more parts.
+    local NonClosedOnly # Select only non closed components
     
     # Defaults
     ratio="0.2"
-    
-    if [ -z "$mlx_sel_small_components_NonClosedOnly" ]; then mlx_sel_small_components_NonClosedOnly="false"; fi
+    NonClosedOnly="false"
     
     for i in "$@"; do
         case $i in
-            ratio=*)
+            [rR]=*|ratio=*)
                 ratio="${i#*=}"
+                shift # past argument=value
+                ;;
+            [nN]on[cC]losed[oO]nly=*)
+                NonClosedOnly="${i#*=}"
                 shift # past argument=value
                 ;;
             *)
@@ -739,13 +785,13 @@ mlx_sel_small_components() {
     echo "\
     <filter name=\"Small component selection\">
         <Param name=\"NbFaceRatio\" description=\"Small component ratio\"value=\"$ratio\" type=\"RichFloat\" tooltip=\"This ratio (between 0 and 1) defines the meaning of &lt;i>small&lt;/i> as the threshold ratio between the number of faces of the largest component and the other ones. A larger value will select more components.\"/>
-        <Param name=\"NonClosedOnly\" description=\"Select only non closed components\" value=\"$mlx_sel_small_components_NonClosedOnly\" type=\"RichBool\" tooltip=\"\"/>
+        <Param name=\"NonClosedOnly\" description=\"Select only non closed components\" value=\"$NonClosedOnly\" type=\"RichBool\" tooltip=\"\"/>
     </filter>" >> "$ml_SF"
 }
 
 # Usage: ratio=(0.2)
-mlx_del_small_components() {
-    mlx_sel_small_components "$@"
+mlx_del_small_parts() {
+    mlx_sel_small_parts "$@"
     mlx_del_sel_V_F
 }
 
@@ -765,7 +811,6 @@ mlx_del_unreferenced_V() {
     echo "    <filter name=\"Remove Unreferenced Vertex\"/>" >> "$ml_SF"
 }
 
-# TIP: follow with measure_topology to check mesh
 mlx_del_F_from_nonmanifold_E () {
     echo "    <filter name=\"Remove Faces from Non Manifold Edges\"/>" >> "$ml_SF"
     mlx_del_unreferenced_V
@@ -780,18 +825,20 @@ mlx_del_F_from_nonmanifold_E () {
 # Usage: transX(mm) transY(mm) transZ(mm)
 mlx_translate() {
     local i
-    local transX
-    local transY
-    local transZ
+    local transX # Amount to translate in the X axis
+    local transY # Amount to translate in the Y axis
+    local transZ # Amount to translate in the Z axis
+    local center # Translate the center of the BBox to the origin
+    local freeze # The transformation is explicitly applied and the vertex coords are actually changed
+    local allLayers # The transformation is explicitly applied to all the mesh and raster layers in the project
     
     # Defaults
     transX=0
     transY=0
     transZ=0
-    
-    if [ -z "$mlx_translate_center" ]; then mlx_translate_center="false"; fi
-    if [ -z "$mlx_translate_Freeze" ]; then mlx_translate_Freeze="true"; fi
-    if [ -z "$mlx_translate_ToAll" ]; then mlx_translate_ToAll="false"; fi
+    center="false"
+    freeze="true"
+    allLayers="false"
     
     for i in "$@"; do
         case $i in
@@ -807,6 +854,18 @@ mlx_translate() {
                 transZ="${i#*=}"
                 shift # past argument=value
                 ;;
+            center=*)
+                center="${i#*=}"
+                shift # past argument=value
+                ;;
+            freeze=*)
+                freeze="${i#*=}"
+                shift # past argument=value
+                ;;
+            all[lL]ayers=*|all=*)
+                allLayers="${i#*=}"
+                shift # past argument=value
+                ;;
             *)
                 # unknown option
                 ;;
@@ -818,9 +877,9 @@ mlx_translate() {
         <Param name=\"axisX\" description=\"X Axis\" value=\"$transX\" min=\"-500\" max=\"500\" type=\"RichDynamicFloat\" tooltip=\"Absolute translation amount along the X axis\"/>
         <Param name=\"axisY\" description=\"Y Axis\" value=\"$transY\" min=\"-500\" max=\"500\" type=\"RichDynamicFloat\" tooltip=\"Absolute translation amount along the Y axis\"/>
         <Param name=\"axisZ\" description=\"Z Axis\" value=\"$transZ\" min=\"-500\" max=\"500\" type=\"RichDynamicFloat\" tooltip=\"Absolute translation amount along the Z axis\"/>
-        <Param name=\"centerFlag\" description=\"translate center of bbox to the origin\" value=\"$mlx_translate_center\"type=\"RichBool\" tooltip=\"If selected, the object is scaled to a box whose sides are at most 1 unit length\"/>
-        <Param name=\"Freeze\" description=\"Freeze Matrix\" value=\"$mlx_translate_Freeze\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied and the vertex coords are actually changed\"/>
-        <Param name=\"ToAll\" description=\"Apply to all layers\" value=\"$mlx_translate_ToAll\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied to all the mesh and raster layers in the project\"/>
+        <Param name=\"centerFlag\" description=\"translate center of bbox to the origin\" value=\"$center\"type=\"RichBool\" tooltip=\"If selected, the object is scaled to a box whose sides are at most 1 unit length\"/>
+        <Param name=\"Freeze\" description=\"Freeze Matrix\" value=\"$freeze\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied and the vertex coords are actually changed\"/>
+        <Param name=\"ToAll\" description=\"Apply to all layers\" value=\"$allLayers\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied to all the mesh and raster layers in the project\"/>
     </filter>" >> "$ml_SF"
 }
 
@@ -1144,7 +1203,7 @@ mlx_subdivide() {
     
     for i in "$@"; do
         case $i in
-            i=*|iterations=*)
+            [iI]=*|[iI]terations=*)
                 iterations="${i#*=}"
                 shift # past argument=value
                 ;;
@@ -1177,7 +1236,7 @@ mlx_smooth() {
     
     for i in "$@"; do
         case $i in
-            i=*|iterations=*)
+            [iI]=*|[iI]terations=*)
                 iterations="${i#*=}"
                 shift # past argument=value
                 ;;
@@ -1304,7 +1363,7 @@ mlx_copy_layer() {
     echo "    <filter name=\"Duplicate Current layer\"/>" >> "$ml_SF"
 }
 
-mlx_split_components() {
+mlx_split_parts() {
 # Creates layers named "CC 0", "CC 1", etc.
 # This doesn't preserve textures!
     echo "    <filter name=\"Split in Connected Components\"/>" >> "$ml_SF"

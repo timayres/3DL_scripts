@@ -457,14 +457,14 @@ do_fix_mesh() {
     dsc="false"
     while [ "$mesh_fixed" = "false" ]; do
         if [ $num_parts -gt 1 ] && [ "$dsc" = "false" ]; then
-            echo ; echo "Deleting small components ... "
+            echo ; echo "Deleting small parts ... "
             ml_IF="$ml_OF"
             ml_OF="$ml_OF"
             ml_LF="TEMP3DP_ML_log_fix_mesh1-dsc.txt"
             ml_SF="TEMP3DP_fix_mesh1-dsc.mlx"
             
             mlx_begin
-            mlx_del_small_components
+            mlx_del_small_parts
             mlx_measure_topology
             mlx_end
             
@@ -584,7 +584,7 @@ do_fix_mesh() {
         parse_topology_log "$ml_LF"
         
         if [ "$manifold" = "2-manifold" ] && [ "$num_holes" = "0" ]; then
-            echo ; echo "  Mesh is composed of $num_parts component(s) and looks \"clean\" (2-manifold and no holes). Continuing on ..."
+            echo ; echo "  Mesh is composed of $num_parts part(s) and looks \"clean\" (2-manifold and no holes). Continuing on ..."
             mesh_fixed="true"
         else
             echo -n "  Mesh has some issues that need to be fixed. Enter \"r\" to re-run mesh fixing script or fix externally and hit \"enter\" when you're ready to continue ... "
@@ -593,7 +593,7 @@ do_fix_mesh() {
         fi
     done
     
-    # delete small components
+    # delete small parts
     # delete bad vertices
     # close holes (MeshLab)
     # ADMesh (closes holes & additional cleaning - stl only)
@@ -613,7 +613,7 @@ do_check_mesh() {
     do_measure_all "$1"
     
     
-    # delete small components
+    # delete small parts
     # delete bad vertices
     # close holes (MeshLab)
     # ADMesh (closes holes & additional cleaning - stl only)

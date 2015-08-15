@@ -39,7 +39,7 @@ if [ 1 ]; then
 
     # mlx_measure_geometry #>=1.3.4 # Compute Geometric Measures
     # mlx_measure_topology #>=1.3.4 # Compute Topological Measures
-    # mlx_del_small_components # Delete Small Components # stl needs vertices merged
+    # mlx_del_small_parts # Delete Small Components # stl needs vertices merged
     # mlx_rotate x=90 # Usage: rotAxis angle
     # mlx_translate x=0 y=0 z=0 # Usage: transX transY transZ
     # mlx_scale scale=1 # Usage: scale | scaleX scaleY scaleZ
@@ -61,7 +61,7 @@ if [ 1 ]; then
     fi
 
     if [  ]; then
-        mlx_del_small_components
+        mlx_del_small_parts
         mlx_measure_topology
     fi
 

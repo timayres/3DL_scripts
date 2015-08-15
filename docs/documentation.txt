@@ -1,0 +1,11 @@
+
+
+Abbreviations used:
+sel = select, selected
+del = delete, deleted
+V = vertex, vertexes, vertices
+E = edge, edges
+F = face, faces, facets
+
+parts = same as "components" in MeshLab (but fewer letters ;) - these are any separate, unconnected geometries
+
