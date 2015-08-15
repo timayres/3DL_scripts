@@ -454,26 +454,41 @@ mlx_merge_V () {
     </filter>" >> "$ml_SF"
 }
 
-# Usage: mlx_close_holes MaxHoleSize=(30)
+# Usage: mlx_close_holes maxholesize=(30)
 # TIP: run subdivide on the slected faces next if the hole is large
 # TODO: automatically subdivide based on how many edges are in hole. 
 # Need to experiment to find good numbers.
 # Run filter with progressivley larger hole sizes, subdiving by increasing amounts as hole gets bigger
 mlx_close_holes() {
     local i
-    local MaxHoleSize # Max hole size to be closed, as expressed as number of edges composing the hole boundary (default 30)
+    local maxholesize # Max hole size to be closed, as expressed as number of edges composing the hole boundary (default 30)
+    local selected # Only the holes with at least one of the boundary faces selected are closed
+    local selnewF # After closing a hole the faces that have been created are left selected. Any previous selection is lost. Useful for example for smoothing the newly created holes.
+    local selfintersection # When closing holes it tries to prevent the creation of faces that intersect faces adjacent to the boundary of the hole. 
+    
     
     # Defaults
-    MaxHoleSize=30
-    
-    if [ -z "$mlx_close_holes_Selected" ]; then mlx_close_holes_Selected="false"; fi
-    if [ -z "$mlx_close_holes_NewFaceSelected" ]; then mlx_close_holes_NewFaceSelected="true"; fi
-    if [ -z "$mlx_close_holes_SelfIntersection" ]; then mlx_close_holes_SelfIntersection="true"; fi
+    maxholesize=30
+    selected="false"
+    selnewF="true"
+    selfintersection="true"
     
     for i in "$@"; do
         case $i in
-            max=*|MaxHoleSize=*)
-                MaxHoleSize="${i#*=}"
+            max=*|maxholesize=*)
+                maxholesize="${i#*=}"
+                shift # past argument=value
+                ;;
+            sel=*|selected=*)
+                selected="${i#*=}"
+                shift # past argument=value
+                ;;
+            selnewF=*|selnewf=*)
+                selnewF="${i#*=}"
+                shift # past argument=value
+                ;;
+            selfintersection=*)
+                selfintersection="${i#*=}"
                 shift # past argument=value
                 ;;
             *)
@@ -484,10 +499,10 @@ mlx_close_holes() {
     
     echo "\
     <filter name=\"Close Holes\">
-        <Param name=\"MaxHoleSize\" description=\"Max size to be closed \" value=\"$MaxHoleSize\" type=\"RichInt\" tooltip=\"The size is expressed as number of edges composing the hole boundary\"/>
-        <Param name=\"Selected\" description=\"Close holes with selected faces\" value=\"$mlx_close_holes_Selected\" type=\"RichBool\" tooltip=\"Only the holes with at least one of the boundary faces selected are closed\"/>
-        <Param name=\"NewFaceSelected\" description=\"Select the newly created faces\" value=\"$mlx_close_holes_NewFaceSelected\" type=\"RichBool\" tooltip=\"After closing a hole the faces that have been created are left selected. Any previous selection is lost. Useful for example for smoothing the newly created holes.\"/>
-        <Param name=\"SelfIntersection\" description=\"Prevent creation of selfIntersecting faces\" value=\"$mlx_close_holes_SelfIntersection\" type=\"RichBool\" tooltip=\"When closing an holes it tries to prevent the creation of faces that intersect faces adjacent to the boundary of the hole. It is an heuristic, non intersetcting hole filling can be NP-complete.\"/>
+        <Param name=\"maxholesize\" description=\"Max size to be closed \" value=\"$maxholesize\" type=\"RichInt\" tooltip=\"The size is expressed as number of edges composing the hole boundary\"/>
+        <Param name=\"Selected\" description=\"Close holes with selected faces\" value=\"$selected\" type=\"RichBool\" tooltip=\"Only the holes with at least one of the boundary faces selected are closed\"/>
+        <Param name=\"NewFaceSelected\" description=\"Select the newly created faces\" value=\"$selnewF\" type=\"RichBool\" tooltip=\"After closing a hole the faces that have been created are left selected. Any previous selection is lost. Useful for example for smoothing the newly created holes.\"/>
+        <Param name=\"SelfIntersection\" description=\"Prevent creation of selfIntersecting faces\" value=\"$selfintersection\" type=\"RichBool\" tooltip=\"When closing an holes it tries to prevent the creation of faces that intersect faces adjacent to the boundary of the hole. It is an heuristic, non intersecting hole filling can be NP-complete.\"/>
     </filter>" >> "$ml_SF"
 }
 
@@ -522,30 +537,68 @@ mlx_reorient_normals() {
 }
 
 mlx_flip_normals() {
+    local i
+    local forceFlip # If true, the normals will always be flipped; otherwise, the filter tries to set them outside
+    local selected # If true, only selected faces will be affected
+    
+    # Defaults
+    forceFlip="false"
+    selected="false"
+    
+    for i in "$@"; do
+        case $i in
+            forceFlip=*|forceflip=*)
+                forceFlip="${i#*=}"
+                shift # past argument=value
+                ;;
+            sel=*|selected=*)
+                selected="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
+    done
+    
     if [ -z "$mlx_flip_normals_forceFlip" ]; then mlx_flip_normals_forceFlip="true"; fi
     if [ -z "$mlx_flip_normals_Selected" ]; then mlx_flip_normals_Selected="false"; fi
     
     echo "\
     <filter name=\"Invert Faces Orientation\">
-        <Param name=\"forceFlip\" description=\"Force Flip\" value=\"$mlx_flip_normals_forceFlip\" type=\"RichBool\" tooltip=\"If selected, the normals will always be flipped; otherwise, the filter tries to set them outside\"/>
-        <Param name=\"onlySelected\" description=\"Flip only selected faces\" value=\"$mlx_flip_normals_Selected\" type=\"RichBool\" tooltip=\"If selected, only selected faces will be affected\"/>
+        <Param name=\"forceFlip\" description=\"Force Flip\" value=\"$forceFlip\" type=\"RichBool\" tooltip=\"If selected, the normals will always be flipped; otherwise, the filter tries to set them outside\"/>
+        <Param name=\"onlySelected\" description=\"Flip only selected faces\" value=\"$selected\" type=\"RichBool\" tooltip=\"If selected, only selected faces will be affected\"/>
     </filter>" >> "$ml_SF"
 }
 
-# TODO: what if you follow reorient normals with mlx_flip_normals with mlx_flip_normals_forceFlip=false; will this correct all normals?
+# Will reorient normals & then make sure they are oriented outside
 mlx_fix_normals() {
     mlx_reorient_normals
-    mlx_flip_normals_forceFlip="false"
     mlx_flip_normals
-    mlx_flip_normals_forceFlip=""
 }
 
 mlx_split_V_on_nonmanifold_F() {
-    if [ -z "$mlx_split_V_on_nonmanifold_F_VertDispRatio" ]; then mlx_split_V_on_nonmanifold_F_VertDispRatio="0"; fi
+    local i
+    local VDispRatio # When a vertex is split it is moved along the average vector going from its position to the baricyenter of the FF connected faces sharing it
+    
+    # Defaults
+    VDispRatio=0
+    
+    for i in "$@"; do
+        case $i in
+            VDispRatio=*|vdispratio=*)
+                VDispRatio="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
+    done
     
     echo "\
     <filter name=\"Split Vertexes Incident on Non Manifold Faces\">
-        <Param name=\"VertDispRatio\" description=\"Vertex Displacement Ratio\" value=\"$mlx_split_V_on_nonmanifold_F_VertDispRatio\" type=\"RichFloat\" tooltip=\"When a vertex is split it is moved along the average vector going from its position to the baricyenter of the FF connected faces sharing it\"/>
+        <Param name=\"VertDispRatio\" description=\"Vertex Displacement Ratio\" value=\"$VDispRatio\" type=\"RichFloat\" tooltip=\"When a vertex is split it is moved along the average vector going from its position to the baricyenter of the FF connected faces sharing it\"/>
     </filter>" >> "$ml_SF"
 }
 

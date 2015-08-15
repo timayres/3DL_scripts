@@ -522,7 +522,7 @@ do_fix_mesh() {
                 
                 mlx_begin
                 #mlx_grow_holes
-                mlx_close_holes 50
+                mlx_close_holes maxholesize=50
                 mlx_measure_topology
                 mlx_end
                 
