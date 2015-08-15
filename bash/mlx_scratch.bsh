@@ -51,11 +51,12 @@ if [ 1 ]; then
     # mlx_smooth 1 # Usage: Iterations
     # mlx_measure_topology
     
-    if [  ]; then
+    if [ 1 ]; then
         #mlx_section z=0 surface=false
-        mlx_section custom=0 customaxis=,5, surface=true planeref=1
+        #mlx_section custom=0 customaxis=,5, surface=true planeref=1
+        mlx_rotate x=65 y=30 customaxis=1,2 custom=20 customCenter=7,,9 center=custom customaxis=4,,6 custom=25 customaxis=,, custom=35
     fi
-    
+    pause
     if [  ]; then
         mlx_offset voxel=1 delta=0.1
     fi

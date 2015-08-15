@@ -390,9 +390,9 @@ mlx_section() {
                 ;;
             custom[aA]xis=*)
                 OIFS="$IFS"; IFS=,; read -a customAxis <<< "${i#*=}"; IFS="$OIFS"
-                for j in "${customAxis[@]}"; do
-                    #echo "j=\"$j\""
-                    if [ -z "$j" ]; then customAxis[j]=0; fi
+                for ((j=0; j<${#customAxis[@]}; j++)); do
+                    if [ -z ${customAxis[$j]} ]; then customAxis[$j]=0; fi
+                    #echo "end j=\"${customAxis[$j]}\""
                 done
                 if [ ${#customAxis[@]} -eq 2 ]; then customAxis[2]=0; fi # sets z axis to 0 if left blank
                 #echo "customAxis = ( ${customAxis[@]} )"
@@ -885,95 +885,104 @@ mlx_translate() {
 
 # Usage: axis=angle axis=angle ...
 # NOTE: additional axis=angle pairs will stack and will be applied in the order listed
-# Usage: rotAxis(x|y|z) angle(deg)
+# set options before defining rotation amount
 mlx_rotate() {
     local i
-    local axis
-    local angle
+    local axis # Axis to rotate about; can be X, Y, Z or custom
+    local angle # Angle of rotation; from -360 to +360 degrees
+    local customAxis # A vector defining the custom axis to rotate about. This rotation axis is used only if the "custom" axis option is used.
+    local center # The center point to rotate about; can be origin, barycenter, or custom.
+    local customCenter # A vector defining the custom center to rotate about. This rotation center is used only if the "custom" center option is used.
+    local freeze # The transformation is explicitly applied and the vertex coords are actually changed
+    local allLayers # The transformation is explicitly applied to all the mesh and raster layers in the project
     
     # Defaults
     axis=2 # Z axis
     angle="0"
+    customAxis=( 0 0 1 )
+    center=0 # 0=origin
+    customCenter=( 0 0 0 )
+    freeze="true"
+    allLayers="false"
     
-    if [ -z "$mlx_rotate_rotCenter" ]; then mlx_rotate_rotCenter="0"; fi #0=origin, 1=barycenter, 2=custom
-    if [ -z "$mlx_rotate_snapFlag" ]; then mlx_rotate_snapFlag="false"; fi
-    if [ -z "$mlx_rotate_customAxis" ]; then mlx_rotate_customAxis=( 0 0 0 ); fi
-    if [ -z "$mlx_rotate_customCenter" ]; then mlx_rotate_customCenter=( 0 0 0 ); fi
-    if [ -z "$mlx_rotate_snapAngle" ]; then mlx_rotate_snapAngle="30"; fi
-    if [ -z "$mlx_rotate_Freeze" ]; then mlx_rotate_Freeze="true"; fi
-    if [ -z "$mlx_rotate_ToAll" ]; then mlx_rotate_ToAll="false"; fi
+    # TODO: add center of mass as a center point option
     
     for i in "$@"; do
         case $i in
             [xX]=*)
                 axis=0 # X axis
                 angle="${i#*=}"
-                echo "\
-        <filter name=\"Transform: Rotate\">
-            <Param name=\"rotAxis\" description=\"Rotation on:\" value=\"$axis\" enum_val0=\"X axis\" enum_val1=\"Y axis\" enum_val2=\"Z axis\" enum_val3=\"custom axis\"  enum_cardinality=\"4\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
-            <Param name=\"rotCenter\" description=\"Center of rotation:\" value=\"$mlx_rotate_rotCenter\" enum_val0=\"origin\" enum_val1=\"barycenter\" enum_val2=\"custom point\" enum_cardinality=\"3\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
-            <Param name=\"angle\" description=\"Rotation Angle\" value=\"$angle\" min=\"-360\" max=\"360\" type=\"RichDynamicFloat\" tooltip=\"Angle of rotation (in &lt;b>degree&lt;/b>). If snapping is enabled this value is rounded according to the snap value\"/>
-            <Param name=\"snapFlag\" description=\"Snap angle\" value=\"$mlx_rotate_snapFlag\" type=\"RichBool\" tooltip=\"If selected, before starting the filter will remove any unreferenced vertex (for which curvature values are not defined)\"/>
-            <Param name=\"customAxis\" description=\"Custom axis\" x=\"${mlx_rotate_customAxis[0]}\" y=\"${mlx_rotate_customAxis[1]}\" z=\"${mlx_rotate_customAxis[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation axis is used only if the 'custom axis' option is chosen.\"/>
-            <Param name=\"customCenter\" description=\"Custom center\" x=\"${mlx_rotate_customCenter[0]}\" y=\"${mlx_rotate_customCenter[1]}\" z=\"${mlx_rotate_customCenter[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation center is used only if the 'custom point' option is chosen.\"/>
-            <Param name=\"snapAngle\" description=\"Snapping Value\" value=\"$mlx_rotate_snapAngle\" type=\"RichFloat\" tooltip=\"This value is used to snap the rotation angle.\"/>
-            <Param name=\"Freeze\" description=\"Freeze Matrix\" value=\"$mlx_rotate_Freeze\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied and the vertex coords are actually changed\"/>
-            <Param name=\"ToAll\" description=\"Apply to all layers\" value=\"$mlx_rotate_ToAll\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied to all the mesh and raster layers in the project\"/>
-        </filter>" >> "$ml_SF"
+                write_rotate
                 shift # past argument=value
                 ;;
             [yY]=*)
                 axis=1 # Y axis
                 angle="${i#*=}"
-                echo "\
-        <filter name=\"Transform: Rotate\">
-            <Param name=\"rotAxis\" description=\"Rotation on:\" value=\"$axis\" enum_val0=\"X axis\" enum_val1=\"Y axis\" enum_val2=\"Z axis\" enum_val3=\"custom axis\"  enum_cardinality=\"4\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
-            <Param name=\"rotCenter\" description=\"Center of rotation:\" value=\"$mlx_rotate_rotCenter\" enum_val0=\"origin\" enum_val1=\"barycenter\" enum_val2=\"custom point\" enum_cardinality=\"3\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
-            <Param name=\"angle\" description=\"Rotation Angle\" value=\"$angle\" min=\"-360\" max=\"360\" type=\"RichDynamicFloat\" tooltip=\"Angle of rotation (in &lt;b>degree&lt;/b>). If snapping is enabled this value is rounded according to the snap value\"/>
-            <Param name=\"snapFlag\" description=\"Snap angle\" value=\"$mlx_rotate_snapFlag\" type=\"RichBool\" tooltip=\"If selected, before starting the filter will remove any unreferenced vertex (for which curvature values are not defined)\"/>
-            <Param name=\"customAxis\" description=\"Custom axis\" x=\"${mlx_rotate_customAxis[0]}\" y=\"${mlx_rotate_customAxis[1]}\" z=\"${mlx_rotate_customAxis[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation axis is used only if the 'custom axis' option is chosen.\"/>
-            <Param name=\"customCenter\" description=\"Custom center\" x=\"${mlx_rotate_customCenter[0]}\" y=\"${mlx_rotate_customCenter[1]}\" z=\"${mlx_rotate_customCenter[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation center is used only if the 'custom point' option is chosen.\"/>
-            <Param name=\"snapAngle\" description=\"Snapping Value\" value=\"$mlx_rotate_snapAngle\" type=\"RichFloat\" tooltip=\"This value is used to snap the rotation angle.\"/>
-            <Param name=\"Freeze\" description=\"Freeze Matrix\" value=\"$mlx_rotate_Freeze\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied and the vertex coords are actually changed\"/>
-            <Param name=\"ToAll\" description=\"Apply to all layers\" value=\"$mlx_rotate_ToAll\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied to all the mesh and raster layers in the project\"/>
-        </filter>" >> "$ml_SF"
+                write_rotate
                 shift # past argument=value
                 ;;
             [zZ]=*)
                 axis=2 # Z axis
                 angle="${i#*=}"
-                echo "\
-        <filter name=\"Transform: Rotate\">
-            <Param name=\"rotAxis\" description=\"Rotation on:\" value=\"$axis\" enum_val0=\"X axis\" enum_val1=\"Y axis\" enum_val2=\"Z axis\" enum_val3=\"custom axis\"  enum_cardinality=\"4\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
-            <Param name=\"rotCenter\" description=\"Center of rotation:\" value=\"$mlx_rotate_rotCenter\" enum_val0=\"origin\" enum_val1=\"barycenter\" enum_val2=\"custom point\" enum_cardinality=\"3\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
-            <Param name=\"angle\" description=\"Rotation Angle\" value=\"$angle\" min=\"-360\" max=\"360\" type=\"RichDynamicFloat\" tooltip=\"Angle of rotation (in &lt;b>degree&lt;/b>). If snapping is enabled this value is rounded according to the snap value\"/>
-            <Param name=\"snapFlag\" description=\"Snap angle\" value=\"$mlx_rotate_snapFlag\" type=\"RichBool\" tooltip=\"If selected, before starting the filter will remove any unreferenced vertex (for which curvature values are not defined)\"/>
-            <Param name=\"customAxis\" description=\"Custom axis\" x=\"${mlx_rotate_customAxis[0]}\" y=\"${mlx_rotate_customAxis[1]}\" z=\"${mlx_rotate_customAxis[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation axis is used only if the 'custom axis' option is chosen.\"/>
-            <Param name=\"customCenter\" description=\"Custom center\" x=\"${mlx_rotate_customCenter[0]}\" y=\"${mlx_rotate_customCenter[1]}\" z=\"${mlx_rotate_customCenter[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation center is used only if the 'custom point' option is chosen.\"/>
-            <Param name=\"snapAngle\" description=\"Snapping Value\" value=\"$mlx_rotate_snapAngle\" type=\"RichFloat\" tooltip=\"This value is used to snap the rotation angle.\"/>
-            <Param name=\"Freeze\" description=\"Freeze Matrix\" value=\"$mlx_rotate_Freeze\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied and the vertex coords are actually changed\"/>
-            <Param name=\"ToAll\" description=\"Apply to all layers\" value=\"$mlx_rotate_ToAll\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied to all the mesh and raster layers in the project\"/>
-        </filter>" >> "$ml_SF"
+                write_rotate
                 shift # past argument=value
                 ;;
             custom=*)
                 axis=3 # Custom axis
-                if [[ " ${mlx_rotate_customAxis[@]} " = " 0 0 0 " ]]; then
-                    echo ; echo "WARNING: mlx_rotate_customAxis is not set! Default value will be used."
+                if [[ " ${customAxis[@]} " = " 0 0 1 " ]]; then
+                    echo ; echo "WARNING: a custom axis was selected, however \"customAxis=\" was not provided. Using default (Z) instead."
                 fi
                 angle="${i#*=}"
-                echo "\
-        <filter name=\"Transform: Rotate\">
-            <Param name=\"rotAxis\" description=\"Rotation on:\" value=\"$axis\" enum_val0=\"X axis\" enum_val1=\"Y axis\" enum_val2=\"Z axis\" enum_val3=\"custom axis\"  enum_cardinality=\"4\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
-            <Param name=\"rotCenter\" description=\"Center of rotation:\" value=\"$mlx_rotate_rotCenter\" enum_val0=\"origin\" enum_val1=\"barycenter\" enum_val2=\"custom point\" enum_cardinality=\"3\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
-            <Param name=\"angle\" description=\"Rotation Angle\" value=\"$angle\" min=\"-360\" max=\"360\" type=\"RichDynamicFloat\" tooltip=\"Angle of rotation (in &lt;b>degree&lt;/b>). If snapping is enabled this value is rounded according to the snap value\"/>
-            <Param name=\"snapFlag\" description=\"Snap angle\" value=\"$mlx_rotate_snapFlag\" type=\"RichBool\" tooltip=\"If selected, before starting the filter will remove any unreferenced vertex (for which curvature values are not defined)\"/>
-            <Param name=\"customAxis\" description=\"Custom axis\" x=\"${mlx_rotate_customAxis[0]}\" y=\"${mlx_rotate_customAxis[1]}\" z=\"${mlx_rotate_customAxis[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation axis is used only if the 'custom axis' option is chosen.\"/>
-            <Param name=\"customCenter\" description=\"Custom center\" x=\"${mlx_rotate_customCenter[0]}\" y=\"${mlx_rotate_customCenter[1]}\" z=\"${mlx_rotate_customCenter[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation center is used only if the 'custom point' option is chosen.\"/>
-            <Param name=\"snapAngle\" description=\"Snapping Value\" value=\"$mlx_rotate_snapAngle\" type=\"RichFloat\" tooltip=\"This value is used to snap the rotation angle.\"/>
-            <Param name=\"Freeze\" description=\"Freeze Matrix\" value=\"$mlx_rotate_Freeze\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied and the vertex coords are actually changed\"/>
-            <Param name=\"ToAll\" description=\"Apply to all layers\" value=\"$mlx_rotate_ToAll\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied to all the mesh and raster layers in the project\"/>
-        </filter>" >> "$ml_SF"
+                write_rotate
+                shift # past argument=value
+                ;;
+            custom[aA]xis=*)
+                OIFS="$IFS"; IFS=,; read -a customAxis <<< "${i#*=}"; IFS="$OIFS"
+                for ((j=0; j<${#customAxis[@]}; j++)); do
+                    if [ -z ${customAxis[$j]} ]; then customAxis[$j]=0; fi
+                    #echo "end j=\"${customAxis[$j]}\""
+                done
+                #echo "Size of array = ${#customAxis[@]}"
+                if [ ${#customAxis[@]} -eq 2 ]; then customAxis[2]=0; fi # sets z axis to 0 if left blank
+                #echo "customAxis = ( ${customAxis[@]} )"
+                shift # past argument=value
+                ;;
+            center=*) # 0=origin, 1=barycenter, 2=custom
+                case "${i#*=}" in
+                    origin )
+                        center=0
+                        ;;
+                    barycenter )
+                        center=1
+                        ;;
+                    custom )
+                        center=2
+                        if [[ " ${customCenter[@]} " = " 0 0 0 " ]]; then
+                            echo ; echo "WARNING: a custom center point was selected, however \"customCenter=\" was not provided. Using default (origin) instead."
+                        fi
+                        ;;
+                    * )
+                        center=0
+                        ;;
+                esac
+                shift # past argument=value
+                ;;
+            custom[cC]enter=*)
+                OIFS="$IFS"; IFS=,; read -a customCenter <<< "${i#*=}"; IFS="$OIFS"
+                for ((j=0; j<${#customCenter[@]}; j++)); do
+                    if [ -z ${customCenter[$j]} ]; then customCenter[$j]=0; fi
+                    #echo "end j=\"${customCenter[$j]}\""
+                done
+                if [ ${#customCenter[@]} -eq 2 ]; then customCenter[2]=0; fi # sets z axis to 0 if left blank
+                #echo "customCenter = ( ${customCenter[@]} )"
+                shift # past argument=value
+                ;;
+            freeze=*)
+                freeze="${i#*=}"
+                shift # past argument=value
+                ;;
+            all[lL]ayers=*|all=*)
+                allLayers="${i#*=}"
                 shift # past argument=value
                 ;;
             *)
@@ -981,6 +990,21 @@ mlx_rotate() {
                 ;;
         esac
     done
+}
+
+write_rotate() {
+    echo "\
+        <filter name=\"Transform: Rotate\">
+            <Param name=\"rotAxis\" description=\"Rotation on:\" value=\"$axis\" enum_val0=\"X axis\" enum_val1=\"Y axis\" enum_val2=\"Z axis\" enum_val3=\"custom axis\"  enum_cardinality=\"4\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
+            <Param name=\"rotCenter\" description=\"Center of rotation:\" value=\"$center\" enum_val0=\"origin\" enum_val1=\"barycenter\" enum_val2=\"custom point\" enum_cardinality=\"3\" type=\"RichEnum\" tooltip=\"Choose a method\"/>
+            <Param name=\"angle\" description=\"Rotation Angle\" value=\"$angle\" min=\"-360\" max=\"360\" type=\"RichDynamicFloat\" tooltip=\"Angle of rotation (in &lt;b>degree&lt;/b>). If snapping is enabled this value is rounded according to the snap value\"/>
+            <Param name=\"snapFlag\" description=\"Snap angle\" value=\"false\" type=\"RichBool\" tooltip=\"If selected, before starting the filter will remove any unreferenced vertex (for which curvature values are not defined)\"/>
+            <Param name=\"customAxis\" description=\"Custom axis\" x=\"${customAxis[0]}\" y=\"${customAxis[1]}\" z=\"${customAxis[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation axis is used only if the 'custom axis' option is chosen.\"/>
+            <Param name=\"customCenter\" description=\"Custom center\" x=\"${customCenter[0]}\" y=\"${customCenter[1]}\" z=\"${customCenter[2]}\" type=\"RichPoint3f\" tooltip=\"This rotation center is used only if the 'custom point' option is chosen.\"/>
+            <Param name=\"snapAngle\" description=\"Snapping Value\" value=\"30\" type=\"RichFloat\" tooltip=\"This value is used to snap the rotation angle.\"/>
+            <Param name=\"Freeze\" description=\"Freeze Matrix\" value=\"$freeze\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied and the vertex coords are actually changed\"/>
+            <Param name=\"ToAll\" description=\"Apply to all layers\" value=\"$allLayers\" type=\"RichBool\" tooltip=\"The transformation is explicitly applied to all the mesh and raster layers in the project\"/>
+        </filter>" >> "$ml_SF"
 }
 
 # Usage: scale=(1)|(X=(1) Y=(1) Z=(1))
