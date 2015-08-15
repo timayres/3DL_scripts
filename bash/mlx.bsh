@@ -602,6 +602,42 @@ mlx_split_V_on_nonmanifold_F() {
     </filter>" >> "$ml_SF"
 }
 
+# TODO: need to test
+mlx_fix_folded_F() {
+    echo "    <filter name=\"Remove Isolated Folded Faces by Edge Flip\"/>" >> "$ml_SF"
+}
+
+mlx_snap_mismatched_borders() {
+    local E_distRatio # Collapse edge when the edge / distance ratio is greater than this value. E.g. for default value 1/1000 two straight border edges are collapsed if the central vertex dist from the straight line composed by the two edges less than a 1/1000 of the sum of the edges length. Larger values enforce that only vertexes very close to the line are removed.
+    local unify_V # If true the snap vertices are welded together.
+    
+    # Defaults
+    E_distRatio="0.01"
+    unify_V="true"
+    
+    for i in "$@"; do
+        case $i in
+            E_dist[rR]atio=*)
+                E_distRatio="${i#*=}"
+                shift # past argument=value
+                ;;
+            unify_V=*)
+                unify_V="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
+    done
+    
+    echo "\
+    <filter name=\"Snap Mismatched Borders\">
+        <Param name=\"EdgeDistRatio\" description=\"Edge Distance Ratio\" value=\"$E_distRatio\" type=\"RichFloat\" tooltip=\"Collapse edge when the edge / distance ratio is greater than this value. E.g. for default value 1000 two straight border edges are collapsed if the central vertex dist from the straight line composed by the two edges less than a 1/1000 of the sum of the edges length. Larger values enforce that only vertexes very close to the line are removed.\"/>
+        <Param name=\"UnifyVertices\" description=\"UnifyVertices\" value=\"$unify_V\" type=\"RichBool\" tooltip=\"if true the snap vertices are weld together.\"/>
+    </filter>" >> "$ml_SF"
+}
+
 ### End Cleaning & Repair ###
 
 
@@ -807,13 +843,25 @@ mlx_del_sel_V_F() {
     echo "    <filter name=\"Delete Selected Faces and Vertices\"/>" >> "$ml_SF"
 }
 
+mlx_del_F_from_nonmanifold_E () {
+    echo "    <filter name=\"Remove Faces from Non Manifold Edges\"/>" >> "$ml_SF"
+    mlx_del_unreferenced_V
+}
+
 mlx_del_unreferenced_V() {
     echo "    <filter name=\"Remove Unreferenced Vertex\"/>" >> "$ml_SF"
 }
 
-mlx_del_F_from_nonmanifold_E () {
-    echo "    <filter name=\"Remove Faces from Non Manifold Edges\"/>" >> "$ml_SF"
-    mlx_del_unreferenced_V
+mlx_del_duplicate_F() {
+    echo "    <filter name=\"Remove Duplicate Faces\"/>" >> "$ml_SF"
+}
+
+mlx_del_duplicate_V(){
+    echo "    <filter name=\"Remove Duplicated Vertex\"/>" >> "$ml_SF"
+}
+
+mlx_del_zero_area_F() {
+    echo "    <filter name=\"Remove Zero Area Faces\"/>" >> "$ml_SF"
 }
 
 ### End Selection & Deletion ###
@@ -1187,6 +1235,9 @@ mlx_simplify() {
     qualityWeight="false"
     autoClean="true"
     
+    if [ -z "$m_color" ]; then set_m_color "$ml_IF"; fi # set m_color based on input file
+    # TODO: add warnings if options are specified that do not apply
+    
     for i in "$@"; do
         case $i in
             [fF]=*|faces=*)
@@ -1247,7 +1298,6 @@ mlx_simplify() {
         esac
     done
     
-    if [ -z "$m_color" ]; then set_m_color "$ml_IF"; fi # set m_color based on input file
     if [ "$m_color" = "UV" ]; then
         echo "\
     <filter name=\"Quadric Edge Collapse Decimation (with texture)\">
