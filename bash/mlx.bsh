@@ -1491,6 +1491,57 @@ mlx_hull() {
     </filter>" >> "$ml_SF"
 }
 
+mlx_reconstruct_surface() {
+    local method # Method to use; currently only Poisson is implemented but others (Ball pivoting & VCG) may be added later
+    
+    # Poisson options:
+    local octreeDepth # Set the depth of the Octree used for extracting the final surface. Suggested range 5..10. Higher numbers mean higher precision in the reconstruction but also higher processing times. Be patient.
+    local solverDivide # This integer argument specifies the depth at which a block Gauss-Seidel solver is used to solve the Laplacian equation. Using this parameter helps reduce the memory overhead at the cost of a small increase in reconstruction time. In practice, the authors have found that for reconstructions of depth 9 or higher a subdivide depth of 7 or 8 can reduce the memory usage. The default value is 8.
+    local samplesPerNode # This floating point value specifies the minimum number of sample points that should fall within an octree node as the octree construction is adapted to sampling density. For noise-free samples, small values in the range [1.0 - 5.0] can be used. For more noisy samples, larger values in the range [15.0 - 20.0] may be needed to provide a smoother, noise-reduced, reconstruction. The default value is 1.0.
+    local offset # Surface offsetting: this floating point value specifies a correction value for the isosurface threshold that is chosen. Values <1 means internal offsetting, >1 external offsetting. Good values are in the range 0.5 .. 2. The default value is 1.0 (no offsetting).
+    
+    # Defaults
+    method="poisson"
+    
+    # Poisson options:
+    octreeDepth=10
+    solverDivide=8
+    samplesPerNode=1
+    offset=1
+    
+    for i in "$@"; do
+        case $i in
+            octree[dD]epth=*)
+                octreeDepth="${i#*=}"
+                shift # past argument=value
+                ;;
+            solver[dD]ivide=*)
+                solverDivide="${i#*=}"
+                shift # past argument=value
+                ;;
+            samples[pP]er[nN]ode=*)
+                samplesPerNode="${i#*=}"
+                shift # past argument=value
+                ;;
+            offset=*)
+                offset="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
+    done
+    
+    echo "\
+    <filter name=\"Surface Reconstruction: Poisson\">
+        <Param name=\"OctDepth\" description=\"Octree Depth\" value=\"$octreeDepth\" type=\"RichInt\" tooltip=\"Set the depth of the Octree used for extracting the final surface. Suggested range 5..10. Higher numbers mean higher precision in the reconstruction but also higher processing times. Be patient.&#xa;\"/>
+        <Param name=\"SolverDivide\" description=\"Solver Divide\" value=\"$solverDivide\" type=\"RichInt\" tooltip=\"This integer argument specifies the depth at which a block Gauss-Seidel solver is used to solve the Laplacian equation.&#xa;Using this parameter helps reduce the memory overhead at the cost of a small increase in reconstruction time. &#xa;In practice, the authors have found that for reconstructions of depth 9 or higher a subdivide depth of 7 or 8 can reduce the memory usage.&#xa;The default value is 8.&#xa;\"/>
+        <Param name=\"SamplesPerNode\" description=\"Samples per Node\" value=\"$samplesPerNode\" type=\"RichFloat\" tooltip=\"This floating point value specifies the minimum number of sample points that should fall within an octree node as the octree&#xa;construction is adapted to sampling density. For noise-free samples, small values in the range [1.0 - 5.0] can be used.&#xa;For more noisy samples, larger values in the range [15.0 - 20.0] may be needed to provide a smoother, noise-reduced, reconstruction.&#xa;The default value is 1.0.\"/>
+        <Param name=\"Offset\" description=\"Surface offsetting\" value=\"$offset\" type=\"RichFloat\" tooltip=\"This floating point value specifies a correction value for the isosurface threshold that is chosen.&#xa;Values &lt; 1 means internal offsetting, >1 external offsetting.Good values are in the range 0.5 .. 2.&#xa;The default value is 1.0 (no offsetting).\"/>
+    </filter>" >> "$ml_SF"
+}
+
 ### End Remeshing ###
 
 
