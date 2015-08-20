@@ -66,7 +66,7 @@ run_meshlab() {
         O="-o $ml_OF"
         if [ -z "$om" ]; then
             #if [ -z "$m_color" ]; then
-            #    set_m_color "$ml_IF"
+            #    do_subfiles "$ml_IF"
             #fi
             do_om "${ml_OF##*.}" # set om options based on output extension and m_color
         fi
@@ -124,6 +124,72 @@ run_openscad() {
     return $return_code
 }
 
+
+# Modify this function to add additional input file support
+# Function to find associated subfiles, e.g. material & texture files.
+do_subfiles () {
+    
+    # Add additional file type support in the future, e.g. ply
+
+    case "${1##*.}" in # check file extension of input
+        [Oo][Bb][Jj] )
+            # Format: mtllib ./model_mesh.obj.mtl
+            material_file=$(grep "mtllib" "$1" 2> /dev/null | cut -d" " -f2)
+            material_file="${material_file##*/}" # strip out path
+    
+            if [ -n "$material_file" ]; then
+                # Format: map_Kd model_texture.jpg
+                # texture_files: array of texture image files
+                OIFS="$IFS"; IFS=$'\n'; texture_files=( $(grep "map_Kd" "$material_file" | cut -d" " -f2) ); IFS="$OIFS"
+                OIFS="$IFS"; IFS=$'\n'; texture_files_unique=( $(sort -u <<< "${texture_files[*]}") ); IFS="$OIFS"
+            fi
+    
+            if [ "$verbosity" -ge 2 ]; then
+                echo
+                echo "Material file: ""$material_file"
+                echo "Number of texture file(s): " ${#texture_files[@]}
+                echo "Number of unique texture file(s): " ${#texture_files_unique[@]}
+                echo "Texture file(s): " ${texture_files[@]}
+                echo "Unique Texture file(s): " ${texture_files_unique[@]}
+            fi
+            ;;
+        [Ss][Tt][Ll] )
+            texture_files=()
+            ;;
+        [Xx]3[Dd] )
+            # Format: <ImageTexture url="model_texture.jpg"/>
+            OIFS="$IFS"; IFS=$'\n'; texture_files=( $(grep "ImageTexture" "$1" | cut -d"\"" -f2) ); IFS="$OIFS"
+            OIFS="$IFS"; IFS=$'\n'; texture_files_unique=( $(sort -u <<< "${texture_files[*]}") ); IFS="$OIFS"
+            if [ "$verbosity" -ge 2 ]; then
+                echo
+                echo "Number of texture file(s): " ${#texture_files[@]}
+                echo "Number of unique texture file(s): " ${#texture_files_unique[@]}
+                echo "Texture file(s): " ${texture_files[@]}
+                echo "Unique Texture file(s): " ${texture_files_unique[@]}
+            fi
+            ;;
+        * )
+            echo "${1##*.} is not currently supported"
+            texture_files=()
+            return 1
+        ;;
+    esac
+    
+    ## Vertex colors could be added in the future
+    if [ ${#texture_files_unique[@]} -ne 0 ]; then
+        m_color="UV"
+    else
+        m_color="NC"
+    fi
+    
+    if [ ${#texture_files[@]} -gt 1 ]; then
+        echo ; echo "WARNING: model has ${#texture_files_unique[@]} unique texture files and ${#texture_files[@]} total texture files!"
+    fi
+    
+    return 0
+}
+
+#Modify this to add more output file types
 do_om () {
     # Function to set MeshLab output mask -m options
     # Usage: the file extension as input to this program
@@ -1235,7 +1301,7 @@ mlx_simplify() {
     qualityWeight="false"
     autoClean="true"
     
-    if [ -z "$m_color" ]; then set_m_color "$ml_IF"; fi # set m_color based on input file
+    if [ -z "$m_color" ]; then do_subfiles "$ml_IF"; fi # set m_color based on input file
     # TODO: add warnings if options are specified that do not apply
     
     for i in "$@"; do
@@ -1502,6 +1568,7 @@ mlx_smooth() {
             sel=*|selected=*)
                 selected="${i#*=}"
                 shift # past argument=value
+                ;;
             *)
                 # unknown option
                 ;;

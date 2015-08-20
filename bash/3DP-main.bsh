@@ -293,7 +293,7 @@ do_metadata () {
     done
     ### End check m_up
 
-    set_m_color "$1"
+    do_subfiles "$1"
   
     ### Check m_solid
     ## S or H
@@ -356,78 +356,10 @@ parse_metadata () {
     fi
 }
 
-set_m_color () {
-    ## UV or NC
-    ## This checks the subfiles to see if there is an associated texture file.
-    ## Vertex colors could be added in the future
-    do_subfiles "$1"
-    if [ ${#texture_files_unique[@]} -ne 0 ]; then
-        m_color="UV"
-    else
-        m_color="NC"
-    fi
-}
-
 set_meta() {
     # meta=".${m_scale}.${m_up}.${m_color}.${m_solid}"
     meta="(${m_scale}${m_up})"
 }
-
-do_subfiles () {
-    # Function to find associated subfiles, e.g. material & texture files.
-    # Add additional file type support in the future, e.g. ply
-
-    case "${1##*.}" in # check file extension of input
-        [Oo][Bb][Jj] )
-            # Format: mtllib ./model_mesh.obj.mtl
-            material_file=$(grep "mtllib" "$1" 2> /dev/null | cut -d" " -f2)
-            material_file="${material_file##*/}" # strip out path
-    
-            if [ -n "$material_file" ]; then
-                # Format: map_Kd model_texture.jpg
-                # texture_files: array of texture image files
-                OIFS="$IFS"; IFS=$'\n'; texture_files=( $(grep "map_Kd" "$material_file" | cut -d" " -f2) ); IFS="$OIFS"
-                OIFS="$IFS"; IFS=$'\n'; texture_files_unique=( $(sort -u <<< "${texture_files[*]}") ); IFS="$OIFS"
-            fi
-    
-            if [ "$verbosity" -ge 2 ]; then
-                echo
-                echo "Material file: ""$material_file"
-                echo "Number of texture file(s): " ${#texture_files[@]}
-                echo "Number of unique texture file(s): " ${#texture_files_unique[@]}
-                echo "Texture file(s): " ${texture_files[@]}
-                echo "Unique Texture file(s): " ${texture_files_unique[@]}
-            fi
-            ;;
-        [Ss][Tt][Ll] )
-            texture_files=()
-            ;;
-        [Xx]3[Dd] )
-            # Format: <ImageTexture url="model_texture.jpg"/>
-            OIFS="$IFS"; IFS=$'\n'; texture_files=( $(grep "ImageTexture" "$1" | cut -d"\"" -f2) ); IFS="$OIFS"
-            OIFS="$IFS"; IFS=$'\n'; texture_files_unique=( $(sort -u <<< "${texture_files[*]}") ); IFS="$OIFS"
-            if [ "$verbosity" -ge 2 ]; then
-                echo
-                echo "Number of texture file(s): " ${#texture_files[@]}
-                echo "Number of unique texture file(s): " ${#texture_files_unique[@]}
-                echo "Texture file(s): " ${texture_files[@]}
-                echo "Unique Texture file(s): " ${texture_files_unique[@]}
-            fi
-            ;;
-        * )
-            echo "${1##*.} is not currently supported"
-            texture_files=()
-            return 1
-        ;;
-    esac
-    
-    if [ ${#texture_files[@]} -gt 1 ]; then
-        echo ; echo "WARNING: model has ${#texture_files_unique[@]} unique texture files and ${#texture_files[@]} total texture files!"
-    fi
-    
-    return 0
-}
-
 
 do_fix_mesh() {
     ##Function to automatically fix mesh, particularly after resampling
