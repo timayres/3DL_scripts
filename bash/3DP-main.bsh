@@ -159,7 +159,6 @@ fi
 #########Functions##########
 
 ##Include sub scripts
-. ${scriptpath}/utilities.bsh
 . ${scriptpath}/mlx.bsh
 . ${scriptpath}/measure.bsh
 . ${scriptpath}/hollow.bsh
