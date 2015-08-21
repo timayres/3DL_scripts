@@ -1,6 +1,6 @@
 #!/bin/bash
 #mlx.bsh
-#license: GPLv2
+#license: LGPLv2.1
 #functions and variables for running MeshLab and mlx scripts
 # filters are based on MeshLab v 1.3.4BETA for 64 bit Windows
 

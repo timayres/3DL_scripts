@@ -1,3 +1,7 @@
-The assorted bash scripts in this repository are released under the GPLv2. Why? Well, since the main programs used by these scripts (MeshLab, OpenSCAD, Blender & ADMesh) are all released under the GPLv2, it seems a no-brainer to follow suit. These scripts would not be possible without this excellent software.
+The assorted bash scripts in this repository (except for mlx.bsh & mlx_scratch.bsh) are released under the GPLv2. Why? Well, since the main programs used by these scripts (MeshLab, OpenSCAD, Blender & ADMesh) are all released under the GPLv2, it seems a no-brainer to follow suit. These scripts would not be possible without this excellent free software.
+
+mlx.bsh is released under the LGPLv2.1 so that you may use these functions in your personal scripts even if you do not publish source code (similar to if you used meshlabserver directly).
+
+mlx_scratch.bsh is an example & testing script & is released into the public domain.
 
 Models in the test_models directory are licensed under the Creative Commons Attribution-ShareAlike 4.0 International License. To view a copy of this license, visit http://creativecommons.org/licenses/by-sa/4.0/ or send a letter to Creative Commons, PO Box 1866, Mountain View, CA 94042, USA.
