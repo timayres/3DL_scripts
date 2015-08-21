@@ -181,7 +181,6 @@ delete_originals() {
     return 0
 }
 
-
 do_metadata () {
     # Function to check metadata and correct if needed
 
@@ -554,7 +553,7 @@ do_check_mesh() {
     return $return_code
 }
 
-# Need to add capability to accept multiple input files first?
+# Need to add capability to accept multiple input files
 # function to use openscad to perform a boolean union on multiple input files
 do_union() {
     echo ; echo "Performing a boolean union on the following meshes: "
@@ -925,7 +924,6 @@ do_rename () {
     return $return_code
 }
 
-
 do_2stl () {
     # Usage: input_file output_file
     # returns do_2stl_OF, admesh_log_file
@@ -1179,7 +1177,6 @@ do_center () {
     return $return_code
 }
 
-
 do_center_x () {
     # Usage: input_file
     # output name is same as input name (original is deleted)
@@ -1271,7 +1268,7 @@ do_center_x () {
 
 #TODO: make UV2jpg script to convert UV textures to jpgs? Intent is to run this prior to uploading to services to decrease upload time.
 
-#TODO: running Patricia through admesh breaks it!
+#TODO: running Patricia through admesh breaks model!
 
 #do_emboss
 

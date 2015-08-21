@@ -1743,10 +1743,13 @@ mlx_rename_layer() {
 
 # Usage: layer=name
 # NEED TO TEST
-# Note" default value was "0"; does this need to be the name of the layer or its number in the stack?
+# Note" default value was "0"; does this need to be the name (label?) of the layer or its number in the stack?
 mlx_change_layer() {
     local i
     local layer
+    
+    # Defaults
+    layer=0
     
     for i in "$@"; do
         case $i in
