@@ -33,13 +33,19 @@ eps=0.00001; //overlap amount for correct booleans
 //default spring length: ~42mm;
 
 // inner post and spring guide
-spring_length=40.5; //Includes bit of bottom post too
+spring_length=40.5; //1.57" Includes bit of bottom post too
 fn_post=32; //number of segments in post
 post_r=14/2;//12.5/2;
 post_h=orig_zmax;
 spring_guide_top_dia=9.5;
 spring_guide_bottom_dia=9;
 spring_guide_height=8;
+
+//Spring dimensions (NE)
+//ID=11.3 mm .44"
+//OD=13.5mm .53"
+//wire diameter: 1 mm .04"
+// No. turns: 5-7
 
 //Calculations
 orig_xsize=orig_xmax-orig_xmin;

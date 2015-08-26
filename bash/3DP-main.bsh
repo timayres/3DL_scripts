@@ -1033,7 +1033,7 @@ do_2objNC () {
     return $return_code
 }
 
-do_2x3dz  () {
+do_2x3dz () {
     # "2x3dz: this function converts a model to x3d format and wraps it along with the associated texture file into a zip file. Primarily intended for submitting color models to Shapeways."
     
     local return_code
@@ -1057,6 +1057,10 @@ do_2x3dz  () {
 
     return_file="${fpref_full}.x3d.zip"
     return $return_code
+}
+
+do_2daez () {
+echo 
 }
 
 do_2objz () {

@@ -167,6 +167,21 @@ do_subfiles () {
                 echo "Unique Texture file(s): " ${texture_files_unique[@]}
             fi
             ;;
+        [Dd][Aa][Ee] ) # COLLADA
+            # Format: <ImageTexture url="model_texture.jpg"/>
+            # Format:   <image id="texture0" name="texture0">
+            #               <init_from>model_texture.jpg</init_from>
+            #           </image>
+            OIFS="$IFS"; IFS=$'\n'; texture_files=( $(grep "ImageTexture" "$1" | cut -d"\"" -f2) ); IFS="$OIFS"
+            OIFS="$IFS"; IFS=$'\n'; texture_files_unique=( $(sort -u <<< "${texture_files[*]}") ); IFS="$OIFS"
+            if [ "$verbosity" -ge 2 ]; then
+                echo
+                echo "Number of texture file(s): " ${#texture_files[@]}
+                echo "Number of unique texture file(s): " ${#texture_files_unique[@]}
+                echo "Texture file(s): " ${texture_files[@]}
+                echo "Unique Texture file(s): " ${texture_files_unique[@]}
+            fi
+            ;;
         * )
             echo "${1##*.} is not currently supported"
             texture_files=()
@@ -224,10 +239,16 @@ do_om () {
             fi
             ;;
         [Ss][Tt][Ll] | [Xx][Yy][Zz] | [Dd][Xx][Ff] )
-            om="" # no colors or other options
+            om="" # no colors or other options; will be exported as binary
+            ;;
+        [Pp][Ll][Yy] ) #TODO: check this!
+            om="$om_flag vc vn wt" # textured ply; will be exported as binary
             ;;
         [Xx]3[Dd] )
             om="$om_flag vc vn wt" # textured x3d
+            ;;
+        [Dd][Aa][Ee] ) # COLLADA
+            om="$om_flag vc vn wt" # textured COLLADA (dae)
             ;;
         * )
             echo "$1 is not currently supported, exiting..."
@@ -412,20 +433,16 @@ parse_topology_log() {
 # line: dxf, obj (need to process obj)
 # points: xyz (for measuring size)
 mlx_section() {
+    # Options & Defaults
+    local axis=2 # The slicing plane is perpendicular to this axis (default Z)
+    local offset=0 # cross-plane offset
+    local surface="false" # false (default) will create a 2D surface, otherwise will create a 1D outline composed of line segments (not a continuous polyline but individual segments)
+    local customAxis=( 0 0 1 ) # custom axis (vector)
+    local planeref=2  #the reference from which the planes are shifted; 0=BB Center, 1=BB Min, 2=Origin
+    
+    # Other
     local i
     local j
-    local axis # The slicing plane is perpendicular to this axis (default Z)
-    local offset # cross-plane offset (default 0)
-    local surface # false (default) will create a 2D surface, otherwise will create a 1D outline composed of line segments (not a continuous polyline but individual segments)
-    local customAxis # custom axis (vector)
-    local planeref #the reference from which the planes are shifted
-    
-    # Defaults
-    axis=2 # Z axis
-    offset=0
-    surface="false"
-    customAxis=( 0 0 1 )
-    planeref=2 #0=BB Center, 1=BB Min, 2=Origin
     
     for i in "$@"; do
         case $i in
@@ -495,11 +512,11 @@ mlx_section() {
 
 # Usage: mlx_merge_V threshold=(0)
 mlx_merge_V () {
-    local i
-    local threshold
+    # Options & Defaults
+    local threshold=0
     
-    # Defaults
-    threshold="0"
+    # Other
+    local i
     
     for i in "$@"; do
         case $i in
@@ -525,18 +542,14 @@ mlx_merge_V () {
 # Need to experiment to find good numbers.
 # Run filter with progressivley larger hole sizes, subdiving by increasing amounts as hole gets bigger
 mlx_close_holes() {
+    # Options & Defaults
+    local maxholesize=30 # Max hole size to be closed, as expressed as number of edges composing the hole boundary (default 30)
+    local selected="false" # Only the holes with at least one of the boundary faces selected are closed
+    local selnewF="true" # After closing a hole the faces that have been created are left selected. Any previous selection is lost. Useful for example for smoothing the newly created holes.
+    local selfintersection="true" # When closing holes it tries to prevent the creation of faces that intersect faces adjacent to the boundary of the hole. 
+    
+    # Other
     local i
-    local maxholesize # Max hole size to be closed, as expressed as number of edges composing the hole boundary (default 30)
-    local selected # Only the holes with at least one of the boundary faces selected are closed
-    local selnewF # After closing a hole the faces that have been created are left selected. Any previous selection is lost. Useful for example for smoothing the newly created holes.
-    local selfintersection # When closing holes it tries to prevent the creation of faces that intersect faces adjacent to the boundary of the hole. 
-    
-    
-    # Defaults
-    maxholesize=30
-    selected="false"
-    selnewF="true"
-    selfintersection="true"
     
     for i in "$@"; do
         case $i in
@@ -573,11 +586,11 @@ mlx_close_holes() {
 
 # Usage: mlx_grow_holes iterations=(3)
 mlx_grow_holes() {
-    local i
-    local iterations
+    # Options & Defaults
+    local iterations=3 # Number of times to grow holes
     
-    # Defaults
-    iterations="3"
+    # Other
+    local i
     
     for i in "$@"; do
         case $i in
@@ -602,13 +615,12 @@ mlx_reorient_normals() {
 }
 
 mlx_flip_normals() {
-    local i
-    local forceFlip # If true, the normals will always be flipped; otherwise, the filter tries to set them outside
-    local selected # If true the filter affects only the selected faces.
+    # Options & Defaults
+    local forceFlip="false" # If true, the normals will always be flipped; otherwise, the filter tries to set them outside
+    local selected="false" # If true the filter affects only the selected faces.
     
-    # Defaults
-    forceFlip="false"
-    selected="false"
+    # Other
+    local i
     
     for i in "$@"; do
         case $i in
@@ -643,11 +655,11 @@ mlx_fix_normals() {
 }
 
 mlx_split_V_on_nonmanifold_F() {
-    local i
-    local VDispRatio # When a vertex is split it is moved along the average vector going from its position to the baricyenter of the FF connected faces sharing it
+    # Options & Defaults
+    local VDispRatio=0 # When a vertex is split it is moved along the average vector going from its position to the baricyenter of the FF connected faces sharing it
     
-    # Defaults
-    VDispRatio=0
+    # Other
+    local i
     
     for i in "$@"; do
         case $i in
@@ -673,12 +685,12 @@ mlx_fix_folded_F() {
 }
 
 mlx_snap_mismatched_borders() {
-    local E_distRatio # Collapse edge when the edge / distance ratio is greater than this value. E.g. for default value 1/1000 two straight border edges are collapsed if the central vertex dist from the straight line composed by the two edges less than a 1/1000 of the sum of the edges length. Larger values enforce that only vertexes very close to the line are removed.
-    local unify_V # If true the snap vertices are welded together.
+    # Options & Defaults
+    local E_distRatio="0.01" # Collapse edge when the edge / distance ratio is greater than this value. E.g. for default value 1/1000 two straight border edges are collapsed if the central vertex dist from the straight line composed by the two edges less than a 1/1000 of the sum of the edges length. Larger values enforce that only vertexes very close to the line are removed.
+    local unify_V="true" # If true the snap vertices are welded together.
     
-    # Defaults
-    E_distRatio="0.01"
-    unify_V="true"
+    # Other
+    local i
     
     for i in "$@"; do
         case $i in
@@ -709,13 +721,12 @@ mlx_snap_mismatched_borders() {
 ### Begin Selection & Deletion ###
 
 mlx_sel_none() {
-    local i
-    local allF # If true the filter will de-select all the faces.
-    local allV # If true the filter will de-select all the vertices.
+    # Options & Defaults
+    local allF="true" # If true the filter will de-select all the faces.
+    local allV="true" # If true the filter will de-select all the vertices.
     
-    # Defaults
-    allF="true"
-    allV="true"
+    # Other
+    local i
     
     for i in "$@"; do
         case $i in
@@ -741,13 +752,12 @@ mlx_sel_none() {
 }
 
 mlx_invert_sel() {
-    local i
-    local invF # If true the filter will de-select all the faces.
-    local invV # If true the filter will de-select all the vertices.
+    # Options & Defaults
+    local invF="true" # If true the filter will de-select all the faces.
+    local invV="true" # If true the filter will de-select all the vertices.
     
-    # Defaults
-    invF="true"
-    invV="true"
+    # Other
+    local i
     
     for i in "$@"; do
         case $i in
@@ -779,12 +789,12 @@ mlx_sel_border() {
 
 # Usage: iterations=(1)
 mlx_grow_sel() {
+    # Options & Defaults
+    local iterations=1
+    
+    # Other
     local i
     local j
-    local iterations
-    
-    # Defaults
-    iterations="1"
     
     for i in "$@"; do
         case $i in
@@ -807,12 +817,12 @@ mlx_grow_sel() {
 
 # Usage: iterations=(1)
 mlx_shrink_sel() {
+    # Options & Defaults
+    local iterations=1
+    
+    # Other
     local i
     local j
-    local iterations
-    
-    # Defaults
-    iterations="1"
     
     for i in "$@"; do
     case $i in
@@ -859,13 +869,12 @@ mlx_del_nonmanifold_E() {
 
 # Usage: ratio=(0.2)
 mlx_sel_small_parts() {
-    local i
-    local ratio # Small part ratio, this ratio (between 0 and 1) defines the meaning of "small" as the threshold ratio between the number of faces of the largest part and the other ones. A larger value will select more parts.
-    local NonClosedOnly # Select only non closed components
+    # Options & Defaults
+    local ratio="0.2" # Small part ratio, this ratio (between 0 and 1) defines the meaning of "small" as the threshold ratio between the number of faces of the largest part and the other ones. A larger value will select more parts.
+    local NonClosedOnly="false" # Select only non closed components
     
-    # Defaults
-    ratio="0.2"
-    NonClosedOnly="false"
+    # Other
+    local i
     
     for i in "$@"; do
         case $i in
@@ -937,21 +946,16 @@ mlx_del_zero_area_F() {
 # Usage: X=(0) Y=(0) Z=(0)
 # Usage: transX(mm) transY(mm) transZ(mm)
 mlx_translate() {
-    local i
-    local transX # Amount to translate in the X axis
-    local transY # Amount to translate in the Y axis
-    local transZ # Amount to translate in the Z axis
-    local center # Translate the center of the BBox to the origin
-    local freeze # The transformation is explicitly applied and the vertex coords are actually changed
-    local allLayers # The transformation is explicitly applied to all the mesh and raster layers in the project
+    # Options & Defaults
+    local transX=0 # Amount to translate in the X axis
+    local transY=0 # Amount to translate in the Y axis
+    local transZ=0 # Amount to translate in the Z axis
+    local center="false" # Translate the center of the BBox to the origin
+    local freeze="true" # The transformation is explicitly applied and the vertex coords are actually changed
+    local allLayers="false" # The transformation is explicitly applied to all the mesh and raster layers in the project
     
-    # Defaults
-    transX=0
-    transY=0
-    transZ=0
-    center="false"
-    freeze="true"
-    allLayers="false"
+    # Other
+    local i
     
     for i in "$@"; do
         case $i in
@@ -996,29 +1000,23 @@ mlx_translate() {
     </filter>" >> "$ml_SF"
 }
 
+# TODO: add center of mass as a center point option for rotate and scale
+
 # Usage: axis=angle axis=angle ...
 # NOTE: additional axis=angle pairs will stack and will be applied in the order listed
 # set options before defining rotation amount
 mlx_rotate() {
+    # Options & Defaults
+    local axis=2 # Axis to rotate about; can be X(0), Y(1), Z(2) or custom(3)
+    local angle=0 # Angle of rotation; from -360 to +360 degrees
+    local customAxis=( 0 0 1 ) # A vector defining the custom axis to rotate about. This rotation axis is used only if the "custom" axis option is used.
+    local center=0 # The center point to rotate about; origin(0), barycenter(1), or custom(2)
+    local customCenter=( 0 0 0 ) # A vector defining the custom center point to rotate about. This rotation center is used only if the "custom" center option is used.
+    local freeze="true" # The transformation is explicitly applied and the vertex coords are actually changed
+    local allLayers="false" # The transformation is explicitly applied to all the mesh and raster layers in the project
+    
+    # Other
     local i
-    local axis # Axis to rotate about; can be X, Y, Z or custom
-    local angle # Angle of rotation; from -360 to +360 degrees
-    local customAxis # A vector defining the custom axis to rotate about. This rotation axis is used only if the "custom" axis option is used.
-    local center # The center point to rotate about; can be origin, barycenter, or custom.
-    local customCenter # A vector defining the custom center point to rotate about. This rotation center is used only if the "custom" center option is used.
-    local freeze # The transformation is explicitly applied and the vertex coords are actually changed
-    local allLayers # The transformation is explicitly applied to all the mesh and raster layers in the project
-    
-    # Defaults
-    axis=2 # Z axis
-    angle="0"
-    customAxis=( 0 0 1 )
-    center=0 #0=origin, 1=barycenter, 2=custom
-    customCenter=( 0 0 0 )
-    freeze="true"
-    allLayers="false"
-    
-    # TODO: add center of mass as a center point option for rotate and scale
     
     for i in "$@"; do
         case $i in
@@ -1122,27 +1120,19 @@ write_rotate() {
 
 # Usage: scale=(1)|(X=(1) Y=(1) Z=(1))
 mlx_scale() {
-    local i
-    local scaleX # amount to scale in X axis
-    local scaleY # amount to scale in Y axis
-    local scaleZ # amount to scale in Z axis
-    local uniform # If true an uniform scaling (the same for all three axes) is applied.
-    local center # The center point to scale about; can be origin, barycenter, or custom.
-    local customCenter # A vector defining the custom center point to scale about. This rotation center is used only if the "custom" center option is used.
-    local unit # If true the object is scaled to a box whose sides are at most 1 unit length
-    local freeze # The transformation is explicitly applied and the vertex coords are actually changed
-    local allLayers # The transformation is explicitly applied to all the mesh and raster layers in the project
+    # Options & Defaults
+    local scaleX=1 # amount to scale in X axis
+    local scaleY=1 # amount to scale in Y axis
+    local scaleZ=1 # amount to scale in Z axis
+    local uniform="true" # If true an uniform scaling (the same for all three axes) is applied.
+    local center=0 # The center point to scale about;  origin(0), barycenter(1), or custom(2)
+    local customCenter=( 0 0 0 ) # A vector defining the custom center point to scale about. This rotation center is used only if the "custom" center option is used.
+    local unit="false" # If true the object is scaled to a box whose sides are at most 1 unit length
+    local freeze="true" # The transformation is explicitly applied and the vertex coords are actually changed
+    local allLayers="false" # The transformation is explicitly applied to all the mesh and raster layers in the project
     
-    # Defaults
-    scaleX=1
-    scaleY=1
-    scaleZ=1
-    uniform="true"
-    center=0 #0=origin, 1=barycenter, 2=custom
-    customCenter=( 0 0 0 )
-    unit="false"
-    freeze="true"
-    allLayers="false"
+    # Other
+    local i
     
     for i in "$@"; do
         case $i in
@@ -1231,10 +1221,11 @@ mlx_scale() {
 }
 
 mlx_freeze_matrix() {
-    local allLayers # The transformation is explicitly applied to all the mesh and raster layers in the project
+    # Options & Defaults
+    local allLayers="false" # The transformation is explicitly applied to all the mesh and raster layers in the project
     
-    # Defaults
-    allLayers="false"
+    # Other
+    local i
     
     for i in "$@"; do
         case $i in
@@ -1262,43 +1253,27 @@ mlx_freeze_matrix() {
 # Usage: faces=(25000)
 # TIP: measure topology fist to find number of faces and area
 mlx_simplify() {
+    # Options & Defaults
+    local faces=25000 # Target number of faces
+    local targetPerc=0 # If non zero, this parameter specifies the desired final size of the mesh as a percentage of the initial mesh.
+    local qualityThr="0.3" # Quality threshold for penalizing bad shaped faces. The value is in the range [0..1; 0 accept any kind of face (no penalties), 0.5  penalize faces with quality <0.5, proportionally to their shape.
+    local preserveBoundary="false" # The simplification process tries not to destroy mesh boundaries
+    local boundaryWeight=1 # The importance of the boundary during simplification. Default (1.0) means that the boundary has the same importance of the rest. Values greater than 1.0 raise boundary importance and has the effect of removing less vertices on the border. Admitted range of values (0,+inf).
+    local preserveNormal="false" # Try to avoid face flipping effects and try to preserve the original orientation of the surface
+    local optimalPlacement="true" # Each collapsed vertex is placed in the position minimizing the quadric error. It can fail (creating bad spikes) in case of very flat areas. If false edges are collapsed onto one of the two original vertices and the final mesh is composed by a subset of the original vertices.
+    local planarQuadric="false" # Add additional simplification constraints that improves the quality of the simplification of the planar portion of the mesh.
+    local selected="false" # If true the filter affects only the selected faces.
+    
+    # Options & Defaults - with texture
+    local extraTexCoordWeight=1 # Additional weight for each extra Texture Coordinates for every (selected) vertex
+    
+    # Options & Defaults - without texture
+    local preserveTopology="true" # Avoid all the collapses that should cause a topology change in the mesh (like closing holes, squeezing handles, etc). If checked the genus of the mesh should stay unchanged.
+    local qualityWeight="false" # Use the Per-Vertex quality as a weighting factor for the simplification. The weight is used as a error amplification value, so a vertex with a high quality value will not be simplified and a portion of the mesh with low quality values will be aggressively simplified.
+    local autoClean="true" # After the simplification an additional set of steps is performed to clean the mesh (unreferenced vertices, bad faces, etc).
+    
+    # Other
     local i
-    local faces # Target number of faces
-    local targetPerc # If non zero, this parameter specifies the desired final size of the mesh as a percentage of the initial mesh.
-    local qualityThr # Quality threshold for penalizing bad shaped faces. The value is in the range [0..1; 0 accept any kind of face (no penalties), 0.5  penalize faces with quality <0.5, proportionally to their shape.
-    local preserveBoundary # The simplification process tries not to destroy mesh boundaries
-    local boundaryWeight # The importance of the boundary during simplification. Default (1.0) means that the boundary has the same importance of the rest. Values greater than 1.0 raise boundary importance and has the effect of removing less vertices on the border. Admitted range of values (0,+inf).
-    local preserveNormal # Try to avoid face flipping effects and try to preserve the original orientation of the surface
-    local optimalPlacement # Each collapsed vertex is placed in the position minimizing the quadric error. It can fail (creating bad spikes) in case of very flat areas. If false edges are collapsed onto one of the two original vertices and the final mesh is composed by a subset of the original vertices.
-    local planarQuadric # Add additional simplification constraints that improves the quality of the simplification of the planar portion of the mesh.
-    local selected # If true the filter affects only the selected faces.
-    
-    # With texture
-    local extraTexCoordWeight # Additional weight for each extra Texture Coordinates for every (selected) vertex
-    
-    # Without texture
-    local preserveTopology # Avoid all the collapses that should cause a topology change in the mesh (like closing holes, squeezing handles, etc). If checked the genus of the mesh should stay unchanged.
-    local qualityWeight # Use the Per-Vertex quality as a weighting factor for the simplification. The weight is used as a error amplification value, so a vertex with a high quality value will not be simplified and a portion of the mesh with low quality values will be aggressively simplified.
-    local autoClean # After the simplification an additional set of steps is performed to clean the mesh (unreferenced vertices, bad faces, etc).
-    
-    # Defaults
-    faces=25000
-    targetPerc="0"
-    qualityThr="0.3"
-    preserveBoundary="false"
-    boundaryWeight="1"
-    preserveNormal="false"
-    optimalPlacement="true"
-    planarQuadric="false"
-    selected="false"
-    
-    # With texture
-    extraTexCoordWeight="1"
-    
-    # Without texture
-    preserveTopology="true"
-    qualityWeight="false"
-    autoClean="true"
     
     if [ -z "$m_color" ]; then do_subfiles "$ml_IF"; fi # set m_color based on input file
     # TODO: add warnings if options are specified that do not apply
@@ -1397,41 +1372,29 @@ mlx_simplify() {
 }
 
 # Usage: voxel=(1) delta=(0)
+# If you prefer to use a precision (as a percentage of the BBdiag) instead of the voxel cell size include the following code in the parent and pass voxel:
+#   precision=1 # 1% of BBdiag
+#   voxel=$(bc <<< "($BBdiag * 0.01 * $precision)")
 mlx_offset() {
-    # BBdiag will be used to set maxes and mins if available
-    # If you prefer to use a precision (as a percentage of the
-    # BBdiag) instead of the voxel cell size include the following code
-    # in the parent and pass offset_CellSize:
-    #   offset_precision="1" # 1% of BBdiag
-    #   offset_CellSize=$(bc <<< "($BBdiag * 0.01 * $offset_precision)")
+    # Options & Defaults
+    local voxel=1 # Voxel cell size for resampling. Smaller cells give better precision at a higher computational cost. Remember that halving the cell size means that you build a volume 8 times larger.
+    local delta=0 # offset amount; negative values offset inwards (inset)
+    local merge_V="true" # If true the mesh generated by MC will be cleaned by unifying vertices that are almost coincident.
+    local discretize="false" # If true the position of the intersected edge of the marching cube grid is not computed by linear interpolation, but it is placed in fixed middle position. As a consequence the resampled object will look severely aliased by a stairstep appearance. Useful only for simulating the output of 3D printing devices.
+    local multisample="false" # If true the distance field is more accurately compute by multisampling the volume (7 sample for each voxel). Much slower but less artifacts.
+    local thicken="false" # If true, you have to choose a not zero Offset and a double surface is built around the original surface, inside and outside. Is useful to convert thin floating surfaces into solid, thick meshes.
     
+    # Other
     local i
-    local voxel # Voxel cell size for resampling. Smaller cells give better precision at a higher computational cost. Remember that halving the cell size means that you build a volume 8 times larger.
-    local delta # offset amount; negative values offset inwards (inset)
-    local voxelMax
-    local deltaMin
-    local deltaMax
-    local merge_V # If true the mesh generated by MC will be cleaned by unifying vertices that are almost coincident.
-    local discretize # If true the position of the intersected edge of the marching cube grid is not computed by linear interpolation, but it is placed in fixed middle position. As a consequence the resampled object will look severely aliased by a stairstep appearance. Useful only for simulating the output of 3D printing devices.
-    local multisample # If true the distance field is more accurately compute by multisampling the volume (7 sample for each voxel). Much slower but less artifacts.
-    local thicken # If true, you have to choose a not zero Offset and a double surface is built around the original surface, inside and outside. Is useful to convert thin floating surfaces into solid, thick meshes.
-    
-    # Defaults
-    voxel=1
-    delta=0
+    local voxelMax="100"
+    local deltaMin="-100"
+    local deltaMax="100"
+    # BBdiag will be used to set maxes and mins if available
     if [ -n "$BBdiag" ]; then
         voxelMax="$BBdiag"
         deltaMin=$(bc <<< "($BBdiag * 0.2 * -1)") #-20% of BBdiag
         deltaMax=$(bc <<< "($BBdiag * 0.2)") #+20% of BBdiag
-    else
-        voxelMax="100"
-        deltaMin="100"
-        deltaMax="100"
     fi
-    merge_V="true"
-    discretize="false"
-    multisample="false"
-    thicken="false"
     
     for i in "$@"; do
         case $i in
@@ -1478,17 +1441,14 @@ mlx_offset() {
 
 # Usage: iterations=(1)
 mlx_subdivide() {
-    local i
-    local iterations # Number of times the model is subdivided.
-    local loopWeight # Change the weighting scheme used; optimize some behaviors in spite of others. Values: loop, enhanceRegularity, enhanceContinuity
-    local E_threshold # Edge threshold: all the edges longer than this threshold will be refined. Setting this value to zero will force an uniform refinement.
-    local selected # If true the filter affects only the selected faces.
+    # Options & Defaults
+    local iterations=1 # Number of times the model is subdivided.
+    local loopWeight=0 # Change the weighting scheme used; optimize some behaviors in spite of others. Values: loop(0), enhanceRegularity(1), enhanceContinuity(2)
+    local E_threshold=0 # Edge threshold: all the edges longer than this threshold will be refined. Setting this value to zero will force an uniform refinement.
+    local selected="false" # If true the filter affects only the selected faces.
     
-    # Defaults
-    iterations="1"
-    loopWeight="0" # 0=loop, 1=enhanceRegularity, 2=enhanceContinuity
-    E_threshold="0"
-    selected="false"
+    # Other
+    local i
     
     for i in "$@"; do
         case $i in
@@ -1538,17 +1498,14 @@ mlx_subdivide() {
 
 # Usage: iterations=(1)
 mlx_smooth() {
-    local i
-    local iterations # The number of times that the whole algorithm (normal smoothing + vertex fitting) is iterated.
-    local boundary # If true the boundary edges are smoothed only by themselves (e.g. the polyline forming the boundary of the mesh is independently smoothed). Can reduce the shrinking on the border but can have strange effects on very small boundaries.
-    local cotangentWeight # Cotangent weighting: if true the cotangent weighting scheme is computed for the averaging of the position. Otherwise (false) the simpler umbrella scheme (1 if the edge is present) is used.
-    local selected # If true the filter affects only the selected faces.
+    # Options & Defaults
+    local iterations=1 # The number of times that the whole algorithm (normal smoothing + vertex fitting) is iterated.
+    local boundary="true" # If true the boundary edges are smoothed only by themselves (e.g. the polyline forming the boundary of the mesh is independently smoothed). Can reduce the shrinking on the border but can have strange effects on very small boundaries.
+    local cotangentWeight="true" # Cotangent weighting: if true the cotangent weighting scheme is computed for the averaging of the position. Otherwise (false) the simpler umbrella scheme (1 if the edge is present) is used.
+    local selected="false" # If true the filter affects only the selected faces.
     
-    # Defaults
-    iterations="1"
-    boundary="true"
-    cotangentWeight="true"
-    selected="false"
+    # Other
+    local i
     
     for i in "$@"; do
         case $i in
@@ -1584,10 +1541,11 @@ mlx_smooth() {
 }
 
 mlx_hull() {
-    local reorient_normals # Re-orient all faces coherently after hull operation.
+    # Options & Defaults
+    local reorient_normals="true" # Re-orient all faces coherently after hull operation.
     
-    # Defaults
-    reorient_normals="true"
+    # Other
+    local i
     
     for i in "$@"; do
         case $i in
@@ -1608,22 +1566,17 @@ mlx_hull() {
 }
 
 mlx_reconstruct_surface() {
-    local method # Method to use; currently only Poisson is implemented but others (Ball pivoting & VCG) may be added later
+    # Options & Defaults
+    local method="poisson" # Method to use; currently only Poisson is implemented but others (Ball pivoting & VCG) may be added later
     
     # Poisson options:
-    local octreeDepth # Set the depth of the Octree used for extracting the final surface. Suggested range 5..10. Higher numbers mean higher precision in the reconstruction but also higher processing times. Be patient.
-    local solverDivide # This integer argument specifies the depth at which a block Gauss-Seidel solver is used to solve the Laplacian equation. Using this parameter helps reduce the memory overhead at the cost of a small increase in reconstruction time. In practice, the authors have found that for reconstructions of depth 9 or higher a subdivide depth of 7 or 8 can reduce the memory usage. The default value is 8.
-    local samplesPerNode # This floating point value specifies the minimum number of sample points that should fall within an octree node as the octree construction is adapted to sampling density. For noise-free samples, small values in the range [1.0 - 5.0] can be used. For more noisy samples, larger values in the range [15.0 - 20.0] may be needed to provide a smoother, noise-reduced, reconstruction. The default value is 1.0.
-    local offset # Surface offsetting: this floating point value specifies a correction value for the isosurface threshold that is chosen. Values <1 means internal offsetting, >1 external offsetting. Good values are in the range 0.5 .. 2. The default value is 1.0 (no offsetting).
+    local octreeDepth=10 # Set the depth of the Octree used for extracting the final surface. Suggested range 5..10. Higher numbers mean higher precision in the reconstruction but also higher processing times. Be patient.
+    local solverDivide=8 # This integer argument specifies the depth at which a block Gauss-Seidel solver is used to solve the Laplacian equation. Using this parameter helps reduce the memory overhead at the cost of a small increase in reconstruction time. In practice, the authors have found that for reconstructions of depth 9 or higher a subdivide depth of 7 or 8 can reduce the memory usage. The default value is 8.
+    local samplesPerNode=1 # This floating point value specifies the minimum number of sample points that should fall within an octree node as the octree construction is adapted to sampling density. For noise-free samples, small values in the range [1.0 - 5.0] can be used. For more noisy samples, larger values in the range [15.0 - 20.0] may be needed to provide a smoother, noise-reduced, reconstruction. The default value is 1.0.
+    local offset=1 # Surface offsetting: this floating point value specifies a correction value for the isosurface threshold that is chosen. Values <1 means internal offsetting, >1 external offsetting. Good values are in the range 0.5 .. 2. The default value is 1.0 (no offsetting).
     
-    # Defaults
-    method="poisson"
-    
-    # Poisson options:
-    octreeDepth=10
-    solverDivide=8
-    samplesPerNode=1
-    offset=1
+    # Other
+    local i
     
     for i in "$@"; do
         case $i in
@@ -1667,17 +1620,14 @@ mlx_reconstruct_surface() {
 # NOTE: filter will discard textures, creates a new layer "Merged Mesh"
 #mlx_flatten_layers_merge_V looks to be a key one; experiment with this
 mlx_flatten_layers() {
-    local i
-    local merge_V # Merge the vertices that are duplicated among different layers. &lt;br>Very useful when the layers are spliced portions of a single big mesh.
-    local keepUnreferenced_V # Keep unreferenced vertices; if true do not discard unreferenced vertices from source layers. Necessary for point-only layers.
-    local mergeVisible # Merge only visible layers.
-    local delLayer # Delete all the merged layers. &lt;br>If all layers are visible only a single layer will remain after the invocation of this filter
+    # Options & Defaults
+    local merge_V="false" # Merge the vertices that are duplicated among different layers. &lt;br>Very useful when the layers are spliced portions of a single big mesh.
+    local keepUnreferenced_V="false" # Keep unreferenced vertices; if true do not discard unreferenced vertices from source layers. Necessary for point-only layers.
+    local mergeVisible="true" # Merge only visible layers.
+    local delLayer="true" # Delete all the merged layers. &lt;br>If all layers are visible only a single layer will remain after the invocation of this filter
     
-    # Defaults
-    merge_V="false"
-    keepUnreferenced_V="false"
-    mergeVisible="true"
-    delLayer="true"
+    # Other
+    local i
     
     for i in "$@"; do
         case $i in
@@ -1720,8 +1670,11 @@ mlx_del_layer() {
 # Usage: layer=name
 # renames current layer
 mlx_rename_layer() {
-    local i
+    # Options & Defaults
     local layer
+    
+    # Other
+    local i
     
     for i in "$@"; do
         case $i in
@@ -1745,11 +1698,11 @@ mlx_rename_layer() {
 # NEED TO TEST
 # Note" default value was "0"; does this need to be the name (label?) of the layer or its number in the stack?
 mlx_change_layer() {
-    local i
-    local layer
+    # Options & Defaults
+    local layer=0 #First (base) layer, usually the first input file unless its been deleted.
     
-    # Defaults
-    layer=0
+    # Other
+    local i
     
     for i in "$@"; do
         case $i in
@@ -1789,23 +1742,20 @@ mlx_split_parts() {
 # Usage: size=(1)|(X=(1) Y=(1) Z=(1)) center=(false)
 # Usage: (size(mm))|(sizeX(mm) sizeY(mm) sizeZ(mm)) [center(true|(false))]
 mlx_cube() {
+    # Options & Defaults
+    local sizeX=1
+    local sizeY=1
+    local sizeZ=1
+    local center="false"
+    
+    # Other
     local i
-    local sizeX
-    local sizeY
-    local sizeZ
-    local center
     
     # Box is centered on origin at creation
     echo "\
     <filter name=\"Box\">
         <Param name=\"size\" description=\"Scale factor\" value=\"1\" type=\"RichFloat\" tooltip=\"Scales the new mesh\"/>
     </filter>" >> "$ml_SF"
-    
-    # Defaults
-    sizeX="1"
-    sizeY="1"
-    sizeZ="1"
-    center="false"
     
     for i in "$@"; do
         case $i in
@@ -1844,7 +1794,7 @@ mlx_cube() {
 }
 
 # Usage: height=(1) (radius=(1)|(radius1=(1) radius2=(1)))|(diameter=(2)|(diameter1=(2) diameter2=(2))) center=(false)
-mlx_cylinder() {
+# Note: need to know m_up in order to orient cylinder correctly!
 # OpenSCAD cylinder:
 #    h This is the height of the cylinder. Default value is 1.
 #    r The radius of both top and bottom ends of the cylinder. Use this parameter if you want plain cylinder. Default value is 1.
@@ -1854,18 +1804,16 @@ mlx_cylinder() {
 #    d1 This is the diameter of the cone on bottom end. Default value is 1.
 #    d2 This is the diameter of the cone on top end. Default value is 1.
 #    center If true will center the height of the cone/cylinder around the origin. Default is false, placing the base of the cylinder or r1 radius of cone at the origin.
-   
-    local i
-    local height
-    local radius1
-    local radius2
-    local center
+mlx_cylinder() {
+    # Options & Defaults
+    local height=1 # height of the cylinder
+    local radius1=1 # radius of the cone on bottom end
+    local radius2=1 # radius of the cone on top end
+    local center="false" # If true will center the height of the cone/cylinder around the origin. Default is false, placing the base of the cylinder or r1 radius of cone at the origin.
     
-    # Defaults
-    height="1"
-    radius1="1"
-    radius2="1"
-    center="false"
+    # Other
+    local i
+
     if [ -z "$fn" ]; then fn="32"; fi
     
     for i in "$@"; do
@@ -1932,15 +1880,12 @@ mlx_cylinder() {
 
 # Usage: radius=(1) subdiv=(3)
 mlx_sphere() {
-    local i
-    local radius
-    local subdiv # Subdivision level; Number of the recursive subdivision of the surface. Default is 3 (a sphere approximation composed by 1280 faces). Admitted values are in the range 0 (an icosahedron) to 8 (a 1.3 MegaTris approximation of a sphere).
-    # F=20*4^subdiv
+    # Options & Defaults
+    local radius=1
+    local subdiv=3 # Subdivision level; Number of the recursive subdivision of the surface. Default is 3 (a sphere approximation composed by 1280 faces). Admitted values are in the range 0 (an icosahedron) to 8 (a 1.3 MegaTris approximation of a sphere). Formula for number of faces: F=20*4^subdiv
     
-    # Defaults
-    radius="1"
-    subdiv="3"
-    #if [ -z "$fn" ]; then fn="32"; fi
+    # Other
+    local i
     
     for i in "$@"; do
         case $i in
@@ -1967,14 +1912,12 @@ mlx_sphere() {
 
 # Usage: angle=(60) subdiv=(3)
 mlx_sphere_cap() {
-    local i
-    local angle # Angle of the cone subtending the cap. It must be <180
-    local subdiv # Subdivision level; Number of the recursive subdivision of the surface. Default is 3 (a sphere approximation composed by 1280 faces). Admitted values are in the range 0 (an icosahedron) to 8 (a 1.3 MegaTris approximation of a sphere).
-    # F=20*4^subdiv
+    # Options & Defaults
+    local angle=60 # Angle of the cone subtending the cap. It must be <180
+    local subdiv=3 # Subdivision level; Number of the recursive subdivision of the surface. Default is 3 (a sphere approximation composed by 1280 faces). Admitted values are in the range 0 (an icosahedron) to 8 (a 1.3 MegaTris approximation of a sphere). Formula for number of faces: F=20*4^subdiv
     
-    # Defaults
-    angle="60"
-    subdiv="3"
+    # Other
+    local i
     
     for i in "$@"; do
         case $i in
@@ -2001,26 +1944,21 @@ mlx_sphere_cap() {
 
 # Usage: (radius_h= radius_v= )|(ID= OD= ) fn_h= fn_v=
 mlx_torus() {
+    # Options & Defaults
+    local radius_h=3 # Radius of the whole horizontal ring of the torus
+    local radius_v=1 # Radius of the vertical section of the ring
+    local ID # Alt; inner diameter of torus, ID=2*(radius_h-radius_v)
+    local OD # Alt; outer diameter of torus, OD=2*(radius_h+radius_v)
+    local fn_h=24 # Subdivision step of the ring
+    local fn_v=12 # Number of sides of the polygonal approximation of the torus section
+    
+    # Other
     local i
-    local radius_h # Radius of the whole horizontal ring of the torus
-    local radius_v # Radius of the vertical section of the ring
-    local ID # Alt; inner diameter of torus
-    local OD # Alt; outer diameter of torus
-    local fn_h # Subdivision step of the ring
-    local fn_v # Number of sides of the polygonal approximation of the torus section
     
-    #ID=2*(radius_h-radius_v)
-    #OD=2*(radius_h+radius_v)
-    
-    # Defaults
-    radius_h="3"
-    radius_v="1"
+    # If fn is set globally use that as default
     if [ -n "$fn" ]; then
         fn_h="$fn"
         fn_v="$fn"
-    else
-        fn_h="24"
-        fn_v="12"
     fi
 
     for i in "$@"; do
@@ -2079,23 +2017,15 @@ mlx_torus() {
 # Usage: size=(1)|(X=(1) Y=(1)) center=(false)
 # 2D square/plane/grid created on XY plane
 mlx_square() { # 2D
+    # Options & Defaults
+    local sizeX=1
+    local sizeY=1
+    local num_V_X=2 # Number of vertices in the X direction. Must be at least 2 (start and end vertices); setting this to a higher value will create an evenly spaced grid.
+    local num_V_Y=2 # Number of vertices in the Y direction. Must be at least 2 (start and end vertices); setting this to a higher value will create an evenly spaced grid.
+    local center="false" # If true square will be centered on origin; otherwise it is place in the positive XY quadrant. Note that the "center" parameter in the mlx script does not actually center the square, not sure what it is doing. Instead this is set to false, which places the plane in the -X,+Y quadrant, and it is translated to the appropriate position after creation.
+    
+    # Other
     local i
-    local sizeX
-    local sizeY
-    local center
-    
-    # Defaults
-    sizeX="1"
-    sizeY="1"
-    center="false"
-    
-    # At minimum these must be 2 (start and end vertices); setting this
-    #+to a higher value will create an evenly spaced grid.
-    if [ -z "$mlx_square_num_V_X" ]; then mlx_square_num_V_X="2"; fi
-    if [ -z "$mlx_square_num_V_Y" ]; then mlx_square_num_V_Y="2"; fi
-    
-    # "center" parameter does not actully center plane, not sure what it is doing. Set this to false, which places the plane in the -X,+Y quadrant.
-    if [ -z "$mlx_square_center" ]; then mlx_square_center="false"; fi
     
     for i in "$@"; do
         case $i in
@@ -2124,14 +2054,14 @@ mlx_square() { # 2D
     
     echo "\
     <filter name=\"Grid Generator\">
-        <Param name=\"numVertX\" description=\"num vertices on x\" value=\"$mlx_square_num_V_X\" type=\"RichInt\" tooltip=\"number of vertices on x. it must be positive\"/>
-        <Param name=\"numVertY\" description=\"num vertices on y\" value=\"$mlx_square_num_V_Y\" type=\"RichInt\" tooltip=\"number of vertices on y. it must be positive\"/>
+        <Param name=\"numVertX\" description=\"num vertices on x\" value=\"$num_V_X\" type=\"RichInt\" tooltip=\"number of vertices on x. it must be positive\"/>
+        <Param name=\"numVertY\" description=\"num vertices on y\" value=\"$num_V_Y\" type=\"RichInt\" tooltip=\"number of vertices on y. it must be positive\"/>
         <Param name=\"absScaleX\" description=\"x scale\" value=\"$sizeX\" type=\"RichFloat\" tooltip=\"absolute scale on x (float)\"/>
         <Param name=\"absScaleY\" description=\"y scale\" value=\"$sizeY\" type=\"RichFloat\" tooltip=\"absolute scale on y (float)\"/>
-        <Param name=\"center\" description=\"centered on origin\" value=\"$mlx_square_center\" type=\"RichBool\" tooltip=\"center grid generated by filter on origin.&lt;br>Grid is first generated and than moved into origin (using muparser lib to perform fast calc on every vertex)\"/>
+        <Param name=\"center\" description=\"centered on origin\" value=\"false\" type=\"RichBool\" tooltip=\"center grid generated by filter on origin.&lt;br>Grid is first generated and than moved into origin (using muparser lib to perform fast calc on every vertex)\"/>
     </filter>" >> "$ml_SF"
     
-    if [ "$center" = "true" ]; then #last positional parameter, center
+    if [ "$center" = "true" ]; then
         mlx_translate x=$(bc <<< "scale=10;($sizeX/2)") y=$(bc <<< "scale=10;(-$sizeY/2)")        
     else
         mlx_translate x="$sizeX"
@@ -2141,13 +2071,14 @@ mlx_square() { # 2D
 # Usage: (radius=(1)|(radius1=(1) radius2=(0)))|(diameter=(2)|(diameter1=(2) diameter2=(0)))
 #2D annulus
 mlx_circle() { #2D
+    # Options & Defaults
+    local radius1=1 # Outer radius of the circle
+    local radius2=0 # Inner radius of the circle (if non-zero it creates an annulus)
+    
+    # Other
     local i
-    local radius1 # Outer radius of the circle
-    local radius2 # Inner radius of the circle (if non-zero it creates an annulus)
-
-    # Defaults
-    radius1="1"
-    radius2="0" #"0.5"
+    
+    # If fn is set globally use that as default
     if [ -z "$fn" ]; then fn="32"; fi
     
     for i in "$@"; do
@@ -2189,6 +2120,176 @@ mlx_circle() { #2D
 }
 
 ### End Create ###
+
+
+### Begin Sampling ###
+
+mlx_hausdorff_distance() {
+    # Options & Defaults
+    local sampledLayer=1 # The mesh whose surface is sampled. For each sample we search the closest point on the Target Mesh.
+    local targetLayer=0 # The mesh that is sampled for the comparison.
+    local saveSample="false" # Save the position and distance of all the used samples on both the two surfaces, creating two new layers with two point clouds representing the used samples.
+    local sample_V="true" # For the search of maxima it is useful to sample vertices and edges of the mesh with a greater care. It is quite probable that the farthest points falls along edges or on mesh vertexes, and with uniform montecarlo sampling approaches the probability of taking a sample over a vertex or an edge is theoretically null. On the other hand this kind of sampling could make the overall sampling distribution slightly biased and slightly affects the cumulative results.
+    local sample_E="true" # See the above comment.
+    local sample_fauxE="false" # See the above comment.
+    local sample_F="true" # See the above comment.
+    local sample_num=4 # The desired number of samples. It can be smaller or larger than the mesh size, and according to the chosen sampling strategy it will try to adapt.
+    local maxdist=1 # Sample points for which we do not find anything within this distance are rejected and not considered neither for averaging nor for max. default: 5% BBdiag of sampled mesh, max 100% BBdiag of sampled mesh
+    
+    # Other
+    local i
+    local maxdistmax=100
+    # BBdiag will be used to set maxes and mins if available
+    if [ -n "$BBdiag" ]; then
+        maxdist=$(bc <<< "($BBdiag * 0.05)") #5% of BBdiag
+        maxdistmax="$BBdiag"
+    fi
+    
+    for i in "$@"; do
+        case $i in
+            sampled[lL]ayer=*)
+                sampledLayer="${i#*=}"
+                shift # past argument=value
+                ;;
+            target[lL]ayer=*)
+                targetLayer="${i#*=}"
+                shift # past argument=value
+                ;;
+            save[sS]ample=*|save=*)
+                saveSample="${i#*=}"
+                shift # past argument=value
+                ;;
+            sample_V=*)
+                sample_V="${i#*=}"
+                shift # past argument=value
+                ;;
+            sample_E=*)
+                sample_E="${i#*=}"
+                shift # past argument=value
+                ;;
+            sample_fauxE=*)
+                sample_fauxE="${i#*=}"
+                shift # past argument=value
+                ;;
+            sample_F=*)
+                sample_F="${i#*=}"
+                shift # past argument=value
+                ;;
+            sample_num=*)
+                sample_num="${i#*=}"
+                shift # past argument=value
+                ;;
+            maxdist=*)
+                maxdist="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
+    done
+    
+    echo "\
+    <filter name=\"Hausdorff Distance\">
+        <Param name=\"SampledMesh\" description=\"Sampled Mesh\" value=\"$sampledLayer\" type=\"RichMesh\" tooltip=\"The mesh whose surface is sampled. For each sample we search the closest point on the Target Mesh.\"/>
+        <Param name=\"TargetMesh\" description=\"Target Mesh\" value=\"$targetLayer\" type=\"RichMesh\" tooltip=\"The mesh that is sampled for the comparison.\"/>
+        <Param name=\"SaveSample\" description=\"Save Samples\" value=\"$saveSample\" type=\"RichBool\" tooltip=\"Save the position and distance of all the used samples on both the two surfaces, creating two new layers with two point clouds representing the used samples.\"/>
+        <Param name=\"SampleVert\" description=\"Sample Vertexes\" value=\"$sample_V\" type=\"RichBool\" tooltip=\"For the search of maxima it is useful to sample vertices and edges of the mesh with a greater care. It is quite probably the the farthest points falls along edges or on mesh vertexes, and with uniform montecarlo sampling approachesthe probability of taking a sample over a vertex or an edge is theoretically null.&lt;br>On the other hand this kind of sampling could make the overall sampling distribution slightly biased and slightly affects the cumulative results.\"/>
+        <Param name=\"SampleEdge\" description=\"Sample Edges\" value=\"$sample_E\" type=\"RichBool\" tooltip=\"See the above comment.\"/>
+        <Param name=\"SampleFauxEdge\" description=\"Sample FauxEdge\" value=\"$sample_fauxE\" type=\"RichBool\" tooltip=\"See the above comment.\"/>
+        <Param name=\"SampleFace\" description=\"Sample Faces\" value=\"$sample_F\" type=\"RichBool\" tooltip=\"See the above comment.\"/>
+        <Param name=\"SampleNum\" description=\"Number of samples\" value=\"$sample_num\" type=\"RichInt\" tooltip=\"The desired number of samples. It can be smaller or larger than the mesh size, and according to the choosed sampling strategy it will try to adapt.\"/>
+        <Param name=\"MaxDist\" description=\"Max Distance\" value=\"$maxdist\" min=\"0\" max=\"$maxdistmax\" type=\"RichAbsPerc\" tooltip=\"Sample points for which we do not find anything whithin this distance are rejected and not considered neither for averaging nor for max.\"/>
+    </filter>" >> "$ml_SF"
+}
+
+mlx_sampling_pd() { # Poisson-disk Sampling
+    # Options & Defaults
+    local SampleNum # The desired number of samples. The ray of the disk is calculated according to the sampling density.
+    local Radius # If not zero this parameter override the previous parameter to allow exact radius specification, max=BBdiag
+    local MontecarloRate # The over-sampling rate that is used to generate the intial Montecarlo samples (e.g. if this parameter is &lt;i>K&lt;/i> means that&lt;i>K&lt;/i> x &lt;i>poisson sample&lt;/i> points will be used). The generated Poisson-disk samples are a subset of these initial Montecarlo samples. Larger this number slows the process but make it a bit more accurate.
+    local SaveMontecarlo # If true, it will generate an additional Layer with the montecarlo sampling that was pruned to build the poisson distribution.
+    local ApproximateGeodesicDistance # If true Poisson Disc distances are computed using an approximate geodesic distance, e.g. an euclidean distance weighted by a function of the difference between the normals of the two points.
+    local Subsample # If true the original vertices of the base mesh are used as base set of points. In this case the SampleNum should be obviously much smaller than the original vertex number.&lt;br>Note that this option is very useful in the case you want to subsample a dense point cloud.
+    local RefineFlag # If true the vertices of the below mesh are used as starting vertices, and they will utterly refined by adding more and more points until possible.
+    local RefineMesh # Used only if the above option is checked.
+    local BestSampleFlag # If true it will use a simple heuristic for choosing the samples. At a small cost (it can slow a bit the process) it usually improve the maximality of the generated sampling.
+    local BestSamplePool # Used only if the Best Sample Flag is true. It control the number of attempt that it makes to get the best sample. It is reasonable that it is smaller than the Montecarlo oversampling factor.
+    local ExactNumFlag # If requested it will try to do a dicotomic search for the best poisson disk radius that will generate the requested number of samples with a tolerance of the 0.5%. Obviously it takes much longer.
+    local RadiusVariance # The radius of the disk is allowed to vary between r and r*var. If this parameter is 1 the sampling is the same of the Poisson Disk Sampling.
+    
+    # Other
+    local i
+    
+    
+    echo "\
+    <filter name=\"Poisson-disk Sampling\">
+        <Param name=\"SampleNum\" description=\"Number of samples\" value=\"1000\" type=\"RichInt\" tooltip=\"The desired number of samples. The ray of the disk is calculated according to the sampling density.\"/>
+        <Param name=\"Radius\" description=\"Explicit Radius\" value=\"0\" min=\"0\" max=\"71.7257\" type=\"RichAbsPerc\" tooltip=\"If not zero this parameter override the previous parameter to allow exact radius specification\"/>
+        <Param name=\"MontecarloRate\" description=\"MonterCarlo OverSampling\" value=\"20\" type=\"RichInt\" tooltip=\"The over-sampling rate that is used to generate the intial Montecarlo samples (e.g. if this parameter is &lt;i>K&lt;/i> means that&lt;i>K&lt;/i> x &lt;i>poisson sample&lt;/i> points will be used). The generated Poisson-disk samples are a subset of these initial Montecarlo samples. Larger this number slows the process but make it a bit more accurate.\"/>
+        <Param name=\"SaveMontecarlo\" description=\"Save Montecarlo\" value=\"false\" type=\"RichBool\" tooltip=\"If true, it will generate an additional Layer with the montecarlo sampling that was pruned to build the poisson distribution.\"/>
+        <Param name=\"ApproximateGeodesicDistance\" description=\"Approximate Geodesic Distance\" value=\"false\" type=\"RichBool\" tooltip=\"If true Poisson Disc distances are computed using an approximate geodesic distance, e.g. an euclidean distance weighted by a function of the difference between the normals of the two points.\"/>
+        <Param name=\"Subsample\" description=\"Base Mesh Subsampling\" value=\"false\" type=\"RichBool\" tooltip=\"If true the original vertices of the base mesh are used as base set of points. In this case the SampleNum should be obviously much smaller than the original vertex number.&lt;br>Note that this option is very useful in the case you want to subsample a dense point cloud.\"/>
+        <Param name=\"RefineFlag\" description=\"Refine Existing Samples\" value=\"false\" type=\"RichBool\" tooltip=\"If true the vertices of the below mesh are used as starting vertices, and they will utterly refined by adding more and more points until possible. \"/>
+        <Param name=\"RefineMesh\" description=\"Samples to be refined\" value=\"0\" type=\"RichMesh\" tooltip=\"Used only if the above option is checked. \"/>
+        <Param name=\"BestSampleFlag\" description=\"Best Sample Heuristic\" value=\"true\" type=\"RichBool\" tooltip=\"If true it will use a simple heuristic for choosing the samples. At a small cost (it can slow a bit the process) it usually improve the maximality of the generated sampling. \"/>
+        <Param name=\"BestSamplePool\" description=\"Best Sample Pool Size\" value=\"10\" type=\"RichInt\" tooltip=\"Used only if the Best Sample Flag is true. It control the number of attempt that it makes to get the best sample. It is reasonable that it is smaller than the Montecarlo oversampling factor.\"/>
+        <Param name=\"ExactNumFlag\" description=\"Exact number of samples\" value=\"false\" type=\"RichBool\" tooltip=\"If requested it will try to do a dicotomic search for the best poisson disk radius that will generate the requested number of samples with a tolerance of the 0.5%. Obviously it takes much longer.\"/>
+        <Param name=\"RadiusVariance\" description=\"Radius Variance\" value=\"1\" type=\"RichFloat\" tooltip=\"The radius of the disk is allowed to vary between r and r*var. If this parameter is 1 the sampling is the same of the Poisson Disk Sampling\"/>
+    </filter>" >> "$ml_SF"
+}
+
+### End Sampling ###
+
+
+### Begin Color ###
+
+# TODO: test out using a function
+# It's possible to use the following per-vertex variables in the expression: x, y, z, nx, ny, nz (normal), r, g, b (color), q (quality), rad, vi (index), vtu, vtv (tex coord) and all custom vertex attributes already defined by user.
+mlx_per_V_color_func() {
+    # Options & Defaults
+    local r=0 # Function to generate Red component. Expected Range 0-255
+    local g=0 # Function to generate Green component. Expected Range 0-255
+    local b=0 # Function to generate Blue component. Expected Range 0-255
+    local a=255 # Function to generate Alpha component. Expected Range 0-255
+    
+    # Other
+    local i
+    
+    for i in "$@"; do
+        case $i in
+            [rR]=*|red=*)
+                r="${i#*=}"
+                shift # past argument=value
+                ;;
+            [gG]=*|green=*)
+                g="${i#*=}"
+                shift # past argument=value
+                ;;
+            [bB]=*|blue=*)
+                b="${i#*=}"
+                shift # past argument=value
+                ;;
+            [aA]=*|alpha=*)
+                a="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
+    done
+    
+    echo "\
+    <filter name=\"Per Vertex Color Function\">
+        <Param name=\"x\" description=\"func r = \" value=\"$r\" type=\"RichString\" tooltip=\"function to generate Red component. Expected Range 0-255\"/>
+        <Param name=\"y\" description=\"func g = \" value=\"$g\" type=\"RichString\" tooltip=\"function to generate Green component. Expected Range 0-255\"/>
+        <Param name=\"z\" description=\"func b = \" value=\"$b\" type=\"RichString\" tooltip=\"function to generate Blue component. Expected Range 0-255\"/>
+        <Param name=\"a\" description=\"func alpha = \" value=\"$a\" type=\"RichString\" tooltip=\"function to generate Alpha component. Expected Range 0-255\"/>
+    </filter>" >> "$ml_SF"
+}
+
+### End Color ###
 
 
 ### Begin Utility Functions ###
