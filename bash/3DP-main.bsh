@@ -3,11 +3,21 @@
 #license: GPLv2
 #version="alpha"
 
-# TODO: write script to generate test models 
+# TODO: update test_model, update scad files to reference it. Use 1:8 model so it works with half-bust.
+
+# TODO: change do_stl to NOT overwrite with admesh.
+
+# TODO: remove do_ prefix?
+
+
+# TODO: write script to generate test models?
 
 # TODO: parse ADMesh output
 
-#TODO: if mesh volume is negative, flip normals (in measure volume)
+# TODO: if mesh volume is negative, flip normals (in measure volume)
+
+# TODO: check filenames for spaces
+
 #verbose="true" # Useful for debugging; set  to true
 #verbosity=6
 # verbosity
@@ -17,11 +27,9 @@
 #  3 = display ADMesh log file (do_2stl)
 #  4 = display ADMesh output (do_2stl)
 #  5 = display output of "silent" programs, i.e. MeshLab (run_meshlab)
-#  6 = display certain variables
+#  6 = display certain variables for debugging purposes
 
-delete_TEMP3DP_files="false" # keep temp files
-
-# TODO: check filenames for spaces
+#delete_TEMP3DP_files="false" # keep temp files - set this in calling program instead
 
 # NOTE: sed does not seem to work on network shares, at least in rename. Models must be on local drive. Or maybe it is just ridiculously slow.
 
@@ -30,47 +38,6 @@ if [ "$verbosity" -ge 6 ]; then
     echo \$1 = "$1"
     echo \$@ = "$@"
 fi
-
-#########3DP Metadata##########
-# Metadata that is useful for 3D mesh models intended for 3D printing.
-# This is intended both to provide a human readable reference for some
-# useful information about the file (scale, etc.), and also
-# provides additional info that scripts can use when processing the mesh.
-# Format: metadata is listed at the end of the file name, before the
-# extension. Metadata fields are separated by periods.
-#
-# Example: mesh_name.s-10.Z.NC.S.obj
-# This states that the mesh is 1/10th scale, the Z axis, does not contain
-# any color info and mesh is solid (not hollow).
-#
-# File assumptions:
-# Model is manifold, aligned to base plane, properly oriented, and units are mm
-#
-# 3DP Metadata fields:
-# No. | Name    | Description
-#-----|---------|----------------------
-#  1   (s)cale    Scale factor based on the mesh\'s real life or original size.
-#                 Format is "#" where "#" is a positive or negative number.
-#                 Negative numbers indicate inverse scaling, e.g. "-10" means
-#                 item is scaled to 1/10th scale.
-#                 Decimals may also be used, although a comma is used as the 
-#                 decimal separator instead of a period, since periods are used
-#                 as the field separator. E.g. "0,1" is equivalent to "-10".
-#                 Default value is "1", meaning mesh is actual size.
-#  2   Up Axis    Which axis is "up"; possible values are Y or Z. Some software
-#                 (e.g. Meshlab, MeshMixer, Blender, Shapeways) assumes that Y
-#                 is up. Many 3D printing programs (e.g. OpenSCAD, Slic3r)
-#                 assumes that Z is up.
-#                 Note that this needs to be considered with fields #3 & #4
-#                 to determine the "height" of the mesh model.
-#  3   Color      Does the mesh contain color info, e.g. an associated texture?
-#                 Possible values are "UV" (for a UV mapped texture) or "NC"
-#                 (for No Color). "VC" (vertex color) may be added in the
-#                 future if there is interest and a need. 
-#  4   (S)olid    Is the mesh hollow, i.e. modelled as a shell with exit holes?
-#   or (H)ollow   Hollowing out meshs can save significant costs when printing,
-#                 especially when using 3DP services.
-#########3DP Metadata##########
 
 ##########Dependencies##########
 ### 3D
@@ -96,17 +63,6 @@ fi
 
 ##########Check environment##########
 if [[ $(uname -s) == CYGWIN* ]]; then
-  # Installation:
-  #   manually install cygwin 
-  #   install apt-cyg https://github.com/transcode-open/apt-cyg via:
-  #     lynx -source rawgit.com/transcode-open/apt-cyg/master/apt-cyg > apt-cyg
-  #     install apt-cyg /bin
-  #   apt-cyg install wget
-  #   apt-cyg install bc pstoedit potrace poppler autotrace zip
-  # manually install inkscape, openscad, meshlab, admesh
-  # can download & launch installers
-  # package admesh, maybe in sub directory, or in cygwin
-	
     ML_VERSION="1.3.4BETA" # MeshLab version, 1.3.3 or 1.3.4BETA or SVN
     
 	# Set paths for dependencies
@@ -118,36 +74,32 @@ if [[ $(uname -s) == CYGWIN* ]]; then
 	alias openscad="openscad.com"
 	alias inkscape="inkscape.com"
 	
-  #to copy & paste into cygwin session for interactive use
-  # PATH="/cygdrive/c/Program Files/VCG/MeshLab":"/cygdrive/c/Program Files/OpenSCAD":"/cygdrive/c/Program Files/Inkscape":"/cygdrive/c/Program Files/admesh":$PATH 
+    #to copy & paste into cygwin session for interactive use
+    # PATH="/cygdrive/c/Program Files/VCG/MeshLab":"/cygdrive/c/Program Files/OpenSCAD":"/cygdrive/c/Program Files/Inkscape":"/cygdrive/c/Program Files/admesh":$PATH 
 	PATH=$MESHLAB_PATH:$OPENSCAD_PATH:$ADMESH_PATH:$INKSCAPE_PATH:$PATH
-
+elif [[ $(uname -s) == Linux* ]]; then
+    ML_VERSION="1.3.3" # MeshLab version, 1.3.3 or 1.3.4BETA or SVN
 #elif [ "$(uname)" == "Darwin" ]; then
     # Do something under Mac OS X platform
-elif [[ $(uname -s) == Linux* ]]; then
-    # Do something under Linux platform
-    ML_VERSION="1.3.3" # MeshLab version, 1.3.3 or 1.3.4BETA or SVN
 fi
 
 # Correct working directory & paths if script was launched from __.cmd file
 if [ "$CMD_LAUNCH" = "true" ]; then
-    nixpath="$(cygpath -u "$1")" #convert Windows path to cygwin path
+    unixpath="$(cygpath -u "$1")" #convert Windows path to cygwin path
 else
-    nixpath="$1"
+    unixpath="$1"
 fi
 
 ### Begin Find file paths
-scriptpath="$(cd "$(dirname "$0")"; pwd -P)" # path of this script file, in bash directory
-#reference this as ${scriptpath%/*} to get parent directory
-fpath="${nixpath%/*}" # input file path
+scriptpath="$(cd "$(dirname "$0")"; pwd -P)" # path of this script file
+#use ${scriptpath%/*} to get parent directory
+fpath="${unixpath%/*}" # input file path
 cd "$fpath" # make the directory containing the input file the current directory
-fbase="${nixpath##*/}" # file basename (prefix+extension)
-fext="${fbase##*.}" # file extension, not currently used in script
-fpref_full="${fbase%.*}" # full file prefix, including metadata
-fpref=$(echo "$fpref_full" | cut -d"." -f1) # file prefix without metadata
+fbase="${unixpath##*/}" # file basename (prefix+extension)
+parse_metadata "$fbase" # set initial fpref_full, fpref, m_scale, m_up
 
 if [ "$verbosity" -ge 6 ]; then
-    echo ; echo scriptpath = "$scriptpath"; echo nixpath="$nixpath"; echo fpath="$fpath"; echo fbase="$fbase"; echo fpref_full="$fpref_full"; echo fext="$fext"; echo ML_VERSION="$ML_VERSION"
+    echo ; echo scriptpath = "$scriptpath"; echo unixpath="$unixpath"; echo fpath="$fpath"; echo fbase="$fbase"; echo fpref_full="$fpref_full"; echo fext="$fext"; echo ML_VERSION="$ML_VERSION"
 fi
 ### End Find file paths
 
@@ -161,9 +113,9 @@ fi
 ##Include sub scripts
 . ${scriptpath}/mlx.bsh
 . ${scriptpath}/measure.bsh
-. ${scriptpath}/hollow.bsh
+. ${scriptpath}/modeling.bsh
 
-delete_originals() {
+delete_originals() { # not currently used
     # function to delete a file and its secondary, e.g. mtl file
     # textures are NOT deleted, since they can be used by multiple files
 
@@ -254,7 +206,12 @@ do_metadata () {
             fi
         fi
     done
-    #m_scale=${m_scale/./,} #replace period with comma
+    # Convert m_scale to scale value
+    if [ $(bc <<< "($m_scale < 0)") -eq 1 ]; then # bc returns 1 if true
+        scale=$(bc <<< "scale=10;(1 / -$m_scale)") #must use scale with division, otherwise it rounds to whole number
+    else
+        scale="$m_scale"
+    fi
     ###/Check m_scale
   
     ### Check m_up
@@ -350,7 +307,7 @@ parse_metadata () {
         #fpref=$(echo "$fpref_full" | awk -F '[)(]' '{$NF=$(NF-1)=""; print $0}')
         #fpref="${fpref// /}" # strip all whitespace, including any interior spaces
         #fpref=$(trim "$fpref")
-        fpref="${fpref_full%(*}" #cut out everything beyong last "("
+        fpref="${fpref_full%(*}" #cut out everything beyond last "("
     fi
 }
 
@@ -586,9 +543,9 @@ do_simplify() {
     local faces
     local half_F
     
-    if [ -z "$m_color" ]; then  
-        do_metadata "$1" # set m_scale
-    fi
+    #if [ -z "$m_color" ]; then  
+    do_metadata "$1" # set m_scale
+    #fi
     
     do_measure_all "$1"
     
@@ -649,16 +606,19 @@ do_pricing  () {
     ###Calculate Pricing for Full Color/Multicolor Material###
     # Shapeways pricing: $3+$0.75/cm3
     shapeways=$(bc <<< "(3 + 0.75 * $volume_cm3)")
-    echo
-    echo Shapeways price for full color material: \$$(printf %.2f "$shapeways")
+    echo ; echo Shapeways price for full color material: \$$(printf %.2f "$shapeways")
 
-    # i.Materialize pricing: 8EUR+0.55EUR/cm3
-    # Find current EUR to USD exchange rate
-
-    i_materialize=$(bc <<< "scale=2;(8 + 0.55 * $volume_cm3)") # in EUR
+    # i.Materialize pricing as of 2015-08-27:
+    # volume_cm3 < 40: 8EUR+0.55EUR/cm3
+    # volume_cm3 >= 40: 6EUR+0.6EUR/cm3
+    
+    if [ $(bc <<< "($"$volume_cm3" < 40)") -eq 1 ]; then # bc returns 1 if true
+        i_materialize=$(bc <<< "scale=2;(8 + 0.55 * $volume_cm3)") # in EUR
+    else
+        i_materialize=$(bc <<< "scale=2;(6 + 0.60 * $volume_cm3)") # in EUR
+    fi
     i_materialize=$(cconv $i_materialize eur usd) # convert to USD
-    echo
-    echo i.Materialize price for full color material: \$$(printf %.2f "$i_materialize")
+    echo ; echo i.Materialize price for full color material: \$$(printf %.2f "$i_materialize")
 
     # Sculpteo: they do not publish their pricing formula
     # need to run some tests to determine formula
@@ -672,9 +632,11 @@ do_scale () {
   
     local return_code
     
-    if [ -z "$m_scale" ]; then  
-        do_metadata "$1" # set m_scale
-    fi
+    #if [ -z "$m_scale" ]; then  
+    do_metadata "$1" # set m_scale
+    #fi
+    
+    scale_cur="$scale" # current scale
   
     #m_scale=${m_scale/,/.} #replace comma with period
   
@@ -695,29 +657,24 @@ do_scale () {
     # echo "Scale factor to convert inches to mm: 25.4"
     # echo "(Note: if you scale the mesh to convert between units then you will need to manually correct the file metadata scale factor afterwards.)"
   
-    echo
-    echo "      Size Table for Common Scale Factors"
-    echo "   Scale  |   Busts (B)    | Full Length (FL) |"
-    echo "   Factor |  18\" (450mm)   |     6' (1.8m)    |"
-    echo " ---------|----------------|------------------|"
-    echo " XXL 1/3  | 6.0\" (150.0mm) |                  |"
-    echo " XL  1/4  | 4.5\" (112.5mm) |                  |"
-    echo " L   1/5  | 3.6\"  (90.0mm) | 14.4\" (360.0mm)  |"
-    echo " M   1/6  | 3.0\"  (75.0mm) | 12.0\" (300.0mm)  |"
-    echo " S   1/8  | 2.3\"  (56.3mm) | 9.0\" (225.0mm)   |"
-    echo " XS  1/10 | 1.8\"  (45.0mm) | 7.2\" (180.0mm)   |"
-    echo "     1/12 |                | 6.0\" (150.0mm)   |"
+    # echo
+    # echo "      Size Table for Common Scale Factors"
+    # echo "   Scale  |   Busts (B)    | Full Length (FL) |"
+    # echo "   Factor |  18\" (450mm)   |     6' (1.8m)    |"
+    # echo " ---------|----------------|------------------|"
+    # echo " XXL 1/3  | 6.0\" (150.0mm) |                  |"
+    # echo " XL  1/4  | 4.5\" (112.5mm) |                  |"
+    # echo " L   1/5  | 3.6\"  (90.0mm) | 14.4\" (360.0mm)  |"
+    # echo " M   1/6  | 3.0\"  (75.0mm) | 12.0\" (300.0mm)  |"
+    # echo " S   1/8  | 2.3\"  (56.3mm) | 9.0\" (225.0mm)   |"
+    # echo " XS  1/10 | 1.8\"  (45.0mm) | 7.2\" (180.0mm)   |"
+    # echo "     1/12 |                | 6.0\" (150.0mm)   |"
 
-    # Convert m_scale to current scale value
+    # Print current scale
     if [ $(bc <<< "($m_scale < 0)") -eq 1 ]; then # bc returns 1 if true
-        scale_cur=$(bc <<< "(-1 * $m_scale)")
-        echo
-        echo "Current scale is 1/$scale_cur"
-        scale_cur=$(bc <<< "scale=10;(1 / $scale_cur)") #must use scale with division, otherwise it rounds to whole number
+        echo ; echo "Current scale is 1:$(bc <<< "(-1 * $m_scale)")"
     else
-        scale_cur="$m_scale"
-        echo
-        echo "  Current scale is $scale_cur"
+        echo ; echo "  Current scale is $scale_cur"
     fi
 
     echo
@@ -790,9 +747,9 @@ do_swapYZ () {
     local return_code
     local angle
   
-    if [ -z "$m_up" ]; then
-        do_metadata "$1" # set m_up
-    fi
+    #if [ -z "$m_up" ]; then
+    do_metadata "$1" # set m_up
+    #fi
 
     if [ "$m_up" = "Y" ]; then # YtoZ: rotate x=90
         m_up="Z"
@@ -821,13 +778,12 @@ do_swapYZ () {
     run_meshlab
     return_code=$?
     
-    if [ -z "$2" ]; then # delete original files
-        if [ -e "$ml_OF" ]; then
-            echo
-    #      delete_originals "$ml_IF"
-    # TODO: instead of deleting originals, can set ml_IF & ml_OF to be the same to overwrite.
-        fi
-    fi
+    # if [ -z "$2" ]; then # delete original files
+    #     if [ -e "$ml_OF" ]; then
+    #         echo
+    #       delete_originals "$ml_IF"
+    #     fi
+    # fi
     
     return_file="$do_swapYZ_OF" 
     return $return_code

@@ -19,6 +19,7 @@ rename
 hollow
 center
 center_x
+half_bust_FFF
 "
 
 scriptpath="$(cd "$(dirname "$0")"; pwd -P)"

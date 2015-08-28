@@ -4,8 +4,8 @@
 
 bottom_open=true;
 
-import_model_pre_processed="TEMP3DP_Ethan_bust5_magnet_H1-pre_processed(-6Z).stl";
-import_model_z_section="TEMP3DP_Ethan_bust5_magnet_H2-Zsection(-6Z).dxf";
+model_stl="TEMP3DP_Ethan_bust5_magnet_H1-pre_processed(-6Z).stl";
+model_bottom_section_stl="TEMP3DP_Ethan_bust5_magnet_H2-Zsection(-6Z).dxf";
     
 grow_offset=0;
 thickness=3;
@@ -56,13 +56,13 @@ y0_cut_box_ztrans=y0_cut_box_zsize/2-z0_cut_box_zsize;
 
 // Cut off back & bottom of bust
 difference() {
-    import (file=import_model_pre_processed, convexity=10);
+    import (file=model_stl, convexity=10);
     translate ([cut_box_xtrans,y0_cut_box_ytrans,y0_cut_box_ztrans]) cube([cut_box_xsize,y0_cut_box_ysize,y0_cut_box_zsize], center=true); // Y=0 cut box MUST BE DIFFERENCED 1ST
     translate ([cut_box_xtrans,z0_cut_box_ytrans,-z0_cut_box_zsize/2]) cube([cut_box_xsize,z0_cut_box_ysize,z0_cut_box_zsize], center=true); // Z=0 cut box
 }
 
 // Extrude back of bust
 difference() {
-    translate ([0,0,-2*(grow_offset+thickness)]) linear_extrude(height = 2*(grow_offset+thickness)+eps) import (file=import_model_z_section, convexity=10);
+    translate ([0,0,-2*(grow_offset+thickness)]) linear_extrude(height = 2*(grow_offset+thickness)+eps) import (file=model_bottom_section_stl, convexity=10);
     translate ([cut_box_xtrans,y0_cut_box_ytrans,y0_cut_box_ztrans]) cube([cut_box_xsize,y0_cut_box_ysize,y0_cut_box_zsize], center=true); // Y=0 cut box
 }

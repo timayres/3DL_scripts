@@ -63,10 +63,11 @@ do_hollow() {
     while [ "$bottom_type_test" = "false" ]; do
         echo ; echo "This script hollows out a solid model to a desired wall thickness."
         echo "PLEASE ENSURE THAT MESH IS \"CLEAN\" BEFORE RUNNING."
+        echo "You should simplify model beforehand to speed up script"
         echo ; echo "How would you like to hollow the solid model? Valid values are:"
         echo "   1 - Completely remove the bottom (default)"
-        echo "   2 - Half-bust with magnet boss - NEW!"
-        echo "   3 - Bobble head - EXPERIMENTAL"        
+        echo "   2 - Half-bust with magnet boss"
+        echo "   3 - Bobble head"        
         
         #echo    "Create an inset rim around the bottom (not implemented)"
         #echo "   3 - Insert a single hole in the bottom center (not implemented)"
@@ -124,23 +125,23 @@ do_hollow() {
     
     echo
     echo " What step do you want to start with?"
-    echo "   1 - Pre-process mesh (e.g. simplify) (MeshLab)"
+    #echo "   1 - Pre-process mesh (e.g. simplify) (MeshLab)"
     echo "   2 - Prepare mesh for offsetting (OpenSCAD)"
     echo "   3 - Offset mesh (MeshLab)"
     echo "   4 - Create negative volume (OpenSCAD)"
-    echo -n " Enter choice, or hit enter to accept the default (\"1\"): "
+    echo -n " Enter choice, or hit enter to accept the default (\"2\"): "
     read step_no
     case "$step_no" in
-        1 | 2 | 3 | 4 )
+        2 | 3 | 4 )
             ;;        
         * )
-            step_no=1
+            step_no=2
             ;;
     esac
     ###/Ask for inputs
   
     ###Measure mesh
-    do_measure_size "$do_hollow_IF_stl"
+    do_measure_geometry "$do_hollow_IF_stl"
     
     orig_xmin="$xmin"
     orig_xmax="$xmax"
@@ -148,6 +149,14 @@ do_hollow() {
     orig_ymax="$ymax"
     orig_zmin="$zmin"
     orig_zmax="$zmax"
+    
+    orig_center_of_mass_x=${center_of_mass[0]}
+    orig_center_of_mass_y=${center_of_mass[1]}
+    orig_center_of_mass_z=${center_of_mass[2]}
+
+    orig_barycenter_x=${barycenter[0]}
+    orig_barycenter_y=${barycenter[1]}
+    orig_barycenter_z=${barycenter[2]}
   
     if [ $(bc <<< "$zmin > 0") -eq 1 ]; then # equals 1 if true, 0 if false
         echo "zmin must be negative, i.e. the bottom of the mesh must be below z=0. Exiting..."
@@ -163,29 +172,29 @@ do_hollow() {
     ###Pre-process mesh (MeshLab)
     if [ $step_no -eq 1 ]; then
         do_h1_pre_process "$do_hollow_IF_stl" "$do_h1_pre_process_OF"
-        ((step_no+=1))
+        ((step_no++))
     fi
     
-    if [  ]; then # skip step 1 and use input for step 2
+    if [ 1 ]; then # skip step 1 and use input for step 2
         do_h1_pre_process_OF="$do_hollow_IF_stl"
     fi
     
     ###Prepare mesh for offsetting (OpenSCAD)
     if [ $step_no -eq 2 ]; then
         do_h2_to_offset "$do_h1_pre_process_OF" "$do_h2_to_offset_OF"
-        ((step_no+=1))
+        ((step_no++))
     fi
     
     ###Offset mesh (MeshLab)
     if [ $step_no -eq 3 ]; then
         do_h3_offset "$do_h2_to_offset_OF" "$do_h3_offset_OF"
-        ((step_no+=1))
+        ((step_no++))
     fi
 	
     ###Create negative volume (OpenSCAD)
     if [ $step_no -eq 4 ]; then
         do_h4_neg_vol "$do_h3_offset_OF" "$do_h4_neg_vol_OF"
-        ((step_no+=1))
+        ((step_no++))
     fi
   
     echo
@@ -280,8 +289,8 @@ do_h2_to_offset() { # OpenSCAD
 
 bottom_open=$bottom_open;
 
-import_model_pre_processed=\"$do_h1_pre_process_OF\";
-import_model_z_section=\"$do_h2_Zsection_OF\";
+model_stl=\"$do_h1_pre_process_OF\";
+model_bottom_section_stl=\"$do_h2_Zsection_OF\";
 
 grow_offset=$grow_offset;
 thickness=$thickness;
@@ -291,7 +300,8 @@ orig_xmax=$orig_xmax;
 orig_ymin=$orig_ymin;
 orig_ymax=$orig_ymax;
 orig_zmin=$orig_zmin;
-orig_zmax=$orig_zmax;" > "$do_h2_to_offset_scad_OF"
+orig_zmax=$orig_zmax;
+" > "$do_h2_to_offset_scad_OF"
             ;;
         2 ) #magnet
             # Take middle section for extrusion
@@ -319,8 +329,8 @@ orig_zmax=$orig_zmax;" > "$do_h2_to_offset_scad_OF"
 
 bottom_open=$bottom_open;
 
-import_model_pre_processed=\"$do_h1_pre_process_OF\";
-import_model_z_section=\"$do_h2_Zsection_OF\";
+model_stl=\"$do_h1_pre_process_OF\";
+model_bottom_section_stl=\"$do_h2_Zsection_OF\";
     
 grow_offset=$grow_offset;
 thickness=$thickness;
@@ -330,7 +340,8 @@ orig_xmax=$orig_xmax;
 orig_ymin=$orig_ymin;
 orig_ymax=$orig_ymax;
 orig_zmin=$orig_zmin;
-orig_zmax=$orig_zmax;" > "$do_h2_to_offset_scad_OF"
+orig_zmax=$orig_zmax;
+" > "$do_h2_to_offset_scad_OF"
             ;;
         3 ) # bobble head
             # Take bottom section for extrusion
@@ -375,7 +386,8 @@ orig_xmax=$orig_xmax;
 orig_ymin=$orig_ymin;
 orig_ymax=$orig_ymax;
 orig_zmin=$orig_zmin;
-orig_zmax=$orig_zmax;" > "$do_h2_to_offset_scad_OF"
+orig_zmax=$orig_zmax;
+" > "$do_h2_to_offset_scad_OF"
             ;;
         * )
             echo "$bottom_type is not a valid value"
@@ -502,7 +514,7 @@ do_h4_neg_vol() { # OpenSCAD
 
 //variables set via calling script
 
-scad_stl_file=\"$do_h4_neg_vol_IF\";
+model_stl=\"$do_h4_neg_vol_IF\";
     
 thickness=$thickness;
 
@@ -511,7 +523,8 @@ orig_xmax=$orig_xmax;
 orig_ymin=$orig_ymin;
 orig_ymax=$orig_ymax;
 orig_zmin=$orig_zmin;
-orig_zmax=$orig_zmax;" > "$do_h4_neg_vol_scad_OF"
+orig_zmax=$orig_zmax;
+" > "$do_h4_neg_vol_scad_OF"
             ;;
         2 ) # half-bust magnet
             
@@ -529,9 +542,9 @@ orig_zmax=$orig_zmax;" > "$do_h4_neg_vol_scad_OF"
 
 //variables set via calling script
 
-import_model_offset=\"$do_h4_neg_vol_IF\";
-import_model_original=\"$do_hollow_IF_stl\";
-    
+model_stl=\"$do_hollow_IF_stl\";
+model_offset_stl=\"$do_h4_neg_vol_IF\";
+
 thickness=$thickness;
 magnet_z_pos=$magnet_z_pos;
 magnet_center_height=$magnet_center_height;
@@ -541,7 +554,16 @@ orig_xmax=$orig_xmax;
 orig_ymin=$orig_ymin;
 orig_ymax=$orig_ymax;
 orig_zmin=$orig_zmin;
-orig_zmax=$orig_zmax;" > "$do_h4_neg_vol_scad_OF"
+orig_zmax=$orig_zmax;
+
+orig_center_of_mass_x=$orig_center_of_mass_x;
+orig_center_of_mass_y=$orig_center_of_mass_y;
+orig_center_of_mass_z=$orig_center_of_mass_z;
+
+orig_barycenter_x=$orig_barycenter_x;
+orig_barycenter_y=$orig_barycenter_y;
+orig_barycenter_z=$orig_barycenter_z;
+" > "$do_h4_neg_vol_scad_OF"
             ;;
         3 ) # bobble head
         
@@ -555,7 +577,8 @@ orig_zmax=$orig_zmax;" > "$do_h4_neg_vol_scad_OF"
 // Inset 90% of half of the bottom width
 bottom_section_width=$xsize;
 
-linear_extrude (height = 10) offset (delta = -0.9*bottom_section_width/2) projection() import (file=\"$do_h2_simp_bottom_section_OF\");" > "$do_h4_find_center_scad_OF"
+linear_extrude (height = 10) offset (delta = -0.9*bottom_section_width/2) projection() import (file=\"$do_h2_simp_bottom_section_OF\");
+" > "$do_h4_find_center_scad_OF"
             
             run_openscad "$do_h4_find_center_scad_OF" "$do_h4_find_center_OF" 
             return_code=$?
@@ -612,7 +635,8 @@ orig_xmax=$orig_xmax;
 orig_ymin=$orig_ymin;
 orig_ymax=$orig_ymax;
 orig_zmin=$orig_zmin;
-orig_zmax=$orig_zmax;" > "$do_h4_neg_vol_scad_OF"        
+orig_zmax=$orig_zmax;
+" > "$do_h4_neg_vol_scad_OF"        
             ;;
         4 ) # Create an inset rim around the bottom
             # ask for rim_inset
@@ -698,5 +722,66 @@ orig_zmax=$orig_zmax;" > "$do_h4_neg_vol_scad_OF"
     return_code=$?
     
     return_file="$do_h4_neg_vol_OF"
+    return $return_code
+}
+
+do_half_bust_FFF() { 
+    local return_code
+    
+    # make an stl version for OpenSCAD processing
+    #do_2stl "$1" #this will also run do_metadata & set m_color=NC
+    #half_bust_FFF_IF="$do_2stl_OF"
+    half_bust_FFF_IF="$1"
+    half_bust_FFF_OF="${fpref}_half_bust_neg_vol${meta}.stl"
+    
+    ###Measure mesh
+    do_measure_geometry "$half_bust_FFF_IF"
+    
+    if [ $(bc <<< "$zmin > 0") -eq 1 ]; then # equals 1 if true, 0 if false
+        echo "zmin must be negative, i.e. the bottom of the mesh must be below z=0. Exiting..."
+        exit 1
+    fi
+    ###/Measure mesh
+    
+    magnet_z_pos=0.2 #magnet z position, in % up from bottom
+    magnet_z_pos=$(bc <<< "scale=10;($magnet_z_pos*$zmax)")
+    thickness=3 # thickness of hanger hole
+    
+    half_bust_FFF_scad_OF="TEMP3DP_${fpref}_half_bust_FFF${meta}.scad" # set scad file name
+    half_bust_FFF_scad_IF="${scriptpath}/../scad/half_bust-FFF.scad"
+    
+            echo "\
+//do_half_bust_FFF function
+
+//variables set via calling script
+
+model_stl=\"$half_bust_FFF_IF\";
+
+thickness=$thickness;
+magnet_z_pos=$magnet_z_pos;
+
+center_of_mass_x=${center_of_mass[0]};
+center_of_mass_y=${center_of_mass[1]};
+center_of_mass_z=${center_of_mass[2]};
+
+barycenter_x=${barycenter[0]};
+barycenter_y=${barycenter[1]};
+barycenter_z=${barycenter[2]};
+
+xmin=$xmin;
+xmax=$xmax;
+ymin=$ymin;
+ymax=$ymax;
+zmin=$zmin;
+zmax=$zmax;
+" > "$half_bust_FFF_scad_OF"
+    
+    line_no=$(grep -n -m1 "CUT LINE" "$half_bust_FFF_scad_IF" | cut -d":" -f1)
+    tail -n +$line_no "$half_bust_FFF_scad_IF" >> "$half_bust_FFF_scad_OF"
+
+    run_openscad "$half_bust_FFF_scad_OF" "$half_bust_FFF_OF" 
+    return_code=$?
+
+    return_file="$half_bust_FFF_OF"
     return $return_code
 }

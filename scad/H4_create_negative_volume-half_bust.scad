@@ -2,8 +2,8 @@
 
 //variables set via calling script
 
-import_model_offset="TEMP3DP_Rashida_magnet_centerx_H3-offset(-8Z).stl";
-import_model_original="Rashida_magnet_centerx(-8Z).stl";
+model_offset_stl="TEMP3DP_Rashida_magnet_centerx_H3-offset(-8Z).stl";
+model_stl="Rashida_magnet_centerx(-8Z).stl";
     
 thickness=3;
 magnet_z_pos=9.9930740;
@@ -85,11 +85,11 @@ module torus(radius, cir_radius, fn=16) {
 //Main program
 
 //* difference() {
-//%rotate ([-90,0,0]) import (file=import_model_original, convexity=10); //original simplified file/*/
+//%rotate ([-90,0,0]) import (file=model_stl, convexity=10); //original simplified file/*/
 
 rotate ([90,0,0]) {
     difference() {
-        import (file=import_model_offset, convexity=10); //(-vol) offset model
+        import (file=model_offset_stl, convexity=10); //(-vol) offset model
         translate ([magnet_x_pos,magnet_z_pos,-eps]) cylinder(r=post_r,h=2*body_h,$fn=50); //(+vol) post main body NOTE: had some CGAL errors with this step on Rashida before centering x. Reducing $fn of this cylinder helped, but not if magnet_x_pos was != 0.
         
     //Top hanger

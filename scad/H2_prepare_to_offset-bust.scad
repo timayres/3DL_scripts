@@ -4,8 +4,8 @@
 
 bottom_open=true;
 
-import_model_pre_processed="../test_models/TEST_MESH_BUST-simplified25K.-10.Z.NC.S.stl";
-import_model_z_section="../test_models/TEST_MESH_BUST-simplified25K_H1-simpZ0section.-10.Z.NC.S.stl";
+model_stl="../test_models/TEST_MESH_BUST-simplified25K.-10.Z.NC.S.stl";
+model_bottom_section_stl="../test_models/TEST_MESH_BUST-simplified25K_H1-simpZ0section.-10.Z.NC.S.stl";
 
 grow_offset=1;
 thickness=3;
@@ -37,7 +37,7 @@ cut_box_ztrans=-cut_box_zsize/2-grow_offset;
 
 module flat_bottom() {
     difference() {
-        import (file=import_model_pre_processed, convexity=10);
+        import (file=model_stl, convexity=10);
         translate ([cut_box_xtrans,cut_box_ytrans,cut_box_ztrans]) cube([cut_box_xsize,cut_box_ysize,cut_box_zsize], center=true);
     }
 }
@@ -45,7 +45,7 @@ module flat_bottom() {
 if (bottom_open) {
     union() {
         flat_bottom();
-        translate ([0,0,-2*(grow_offset+thickness)-grow_offset]) linear_extrude(height = 2*(grow_offset+thickness)+eps) import (file=import_model_z_section);
+        translate ([0,0,-2*(grow_offset+thickness)-grow_offset]) linear_extrude(height = 2*(grow_offset+thickness)+eps) import (file=model_bottom_section_stl);
     }
 } else {
     flat_bottom();

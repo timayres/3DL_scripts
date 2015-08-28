@@ -81,23 +81,6 @@ if [  ]; then
 
     fi
     
-    # Create a target!
-    if [ 1 ]; then
-        fn=50
-        ml_SF="TEMP3DP_target.mlx"
-        ml_OF="target.obj"
-        mlx_begin
-        mlx_del_layer
-        mlx_circle r=1
-        mlx_per_V_color_func r=255
-        #mlx_circle r1=3 r2=2
-        #mlx_per_V_color_func r=255
-        #mlx_circle r1=5 r2=4
-        #mlx_per_V_color_func r=255
-        #mlx_flatten_layers
-        #mlx_per_V_color_func r=255
-    fi
-    
     mlx_end
 
     #set -x
@@ -106,9 +89,10 @@ if [  ]; then
     return_code=$?
 fi
 
+# TODO: test out mlp files; can you output multiple files?
 
 # Create a target!
-if [ 1 ]; then
+if [  ]; then
     fn=50
     ml_IF="$fbase"
     ml_SF="TEMP3DP_target.mlx"
@@ -126,11 +110,19 @@ if [ 1 ]; then
     mlx_flatten_layers
     mlx_end
     
+    #TODO: try this without an input file
+    #meshlabserver -o "$ml_OF" -m vn vc  -s "$ml_SF"
     meshlabserver -i "$ml_IF" -o "$ml_OF" -m vn vc  -s "$ml_SF"
     return_code=$?
     if [ $return_code -ne 0 ]; then
         pause "Uh oh, looks like there's an error. Hit any key to keep going anyway ... "
     fi
+fi
+
+if [ 1 ]; then
+
+do_half_bust_FFF "$fbase"
+
 fi
 
 # load file

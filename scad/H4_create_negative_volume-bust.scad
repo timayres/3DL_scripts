@@ -2,7 +2,7 @@
 
 //variables set via calling script
 
-scad_stl_file="../test_models/TEST_MESH_BUST-simplified25K_H2-offset.-10.Z.NC.S.stl";
+model_stl="../test_models/TEST_MESH_BUST-simplified25K_H2-offset.-10.Z.NC.S.stl";
 
 thickness=-3;
 
@@ -27,6 +27,6 @@ cut_box_zsize= (-1.10*orig_zmin) < (2*thickness) ? 2*thickness : -1.10*orig_zmin
 
 //Main program
 union() {
-    import (file=scad_stl_file, convexity=10);
+    import (file=model_stl, convexity=10);
     translate ([cut_box_xtrans,cut_box_ytrans,-cut_box_zsize/2]) cube([cut_box_xsize,cut_box_ysize,cut_box_zsize], center=true);
 }
