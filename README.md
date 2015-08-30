@@ -119,6 +119,7 @@ First define the variable `ml_SF` with the filename of the script file you want 
 Functions that begin with `mlx` actually write xml code to the `ml_SF` filename.
 
 `mlx_begin` - must always be the first mlx function called. This writes the opening tags, and also adds `mlx_merge_V` for stl files (this is the same as selecting "Unify Duplicate Vertices" when importing STLs in the gui).
+
 `mlx_end` - must always be the last mlx function called; this writes the closing tag.
 
 Here's a sample script to scale a model to half size and move 1 mm down in the Z axis:
@@ -134,7 +135,7 @@ mlx_end
 ###Filters
 Not all MeshLab filters have been implemented yet, however a useful subset has. It's reasonably straightforward to add additional filters, so it you need something extra please send a request! Currently the best documentation on implemented filters and their usage is the code itself.
 
-mlx.bsh uses a few abbreviations to shorten names for common words:
+mlx.bsh uses a few abbreviations to shorten names for common terms:
 - V = vertex, vertexes, vertices
 - E = edge, edges
 - F = face, faces, facets
@@ -143,13 +144,13 @@ mlx.bsh uses a few abbreviations to shorten names for common words:
 - parts = same as "components" in MeshLab (but fewer letters ;); some other programs call these "shells". These are any separate, unconnected geometries in the mesh.
 - layer = MeshLab uses "layer" and "mesh" somewhat interchangeably. This isn't entirely correct, as a layer could contain something other than a mesh (e.g. a point cloud), so the more general term is used.
 
-MeshLab likes to give filters long and highly technical names; wile accurate, this can be confusing for newcomers (and some oldtimers ;), and is a bit much to type out in scripts. Therefore, some filters have been renamed to give them shorter (and hopefully clearer) names. For example, filter "Quadric Edge Collapse Decimation" is called with the function `mlx_simplify`.
+MeshLab likes to give filters long and highly technical names; while accurate, this can be confusing for newcomers (and some oldtimers ;), and is a bit much to type out in scripts. Therefore, some filters have been renamed to give them shorter (and hopefully clearer) names. For example, filter "Quadric Edge Collapse Decimation" is called with the function `mlx_simplify`.
 
 Additional filter combinations are also included for convenience. For example, `mlx_del_small_parts` combines `mlx_sel_small_parts` with `mlx_del_sel_V_F`. 
 
 Some filters have additional features added or a different interface defined. For example, `mlx_simplify` will run a different version of the filter depending if the model has a UV texture. The mesh creation filters have been changed extensively to give them more of an OpenSCAD-like interface.
 
-All filter opens are specified when calling the filter using the pattern `option=value`. Read the code to see specifics. All options that are available can be specified unless they serve no purpose in a script (such as the rotation snap angle). All options have default values so it is not required to specify any options at all (although for some filters such as the transformations a call with no options won't actually do anything). Please note that the default values are those we've found to be the most useful and may differ from MeshLab's defaults. Check first!
+All filter options are specified when calling the filter using the pattern `option=value`. Read the code to see specifics. All options that are available can be specified unless they serve no purpose in a script (such as the rotation snap angle). All options have default values so it is not required to specify any options at all (although for some filters such as the transformations a call with no options won't actually do anything). Please note that the default values are those we've found to be the most useful and may differ from MeshLab's defaults. Check first!
 
 ###Run the script in meshlabserver
 You have two options to run mlx scripts, the `run_meshlab` function or just calling meshlabserver directly.
