@@ -275,7 +275,7 @@ mlx_end() {
 #example usage
 #    ml_SF="TEMP3DP_filter_script.mlx"
 #    mlx_begin
-#    mlx_scale scale=-10
+#    mlx_scale scale=.5
 #    mlx_end
 
 

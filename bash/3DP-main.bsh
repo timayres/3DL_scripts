@@ -231,7 +231,7 @@ do_metadata () {
     done
     # Convert m_scale to scale value
     if [ $(bc <<< "($m_scale < 0)") -eq 1 ]; then # bc returns 1 if true
-        scale=$(bc <<< "scale=10;(1 / -$m_scale)") #must use scale with division, otherwise it rounds to whole number
+        scale=$(bc <<< "scale=10;(-1 / $m_scale)") #must use scale with division, otherwise it rounds to whole number
     else
         scale="$m_scale"
     fi
@@ -539,6 +539,7 @@ done
 }
 
 do_simplify() {
+    
     local return_code
     local faces
     local half_F
@@ -551,7 +552,7 @@ do_simplify() {
     
     avg_face_area=$(bc <<< "scale=10;($area_mm2/$num_F)")
     avg_face_area_100=$(bc <<< "scale=10;($avg_face_area*100)")
-    half_F=$(bc <<< "scale=10;($num_f*0.5)")
+    half_F=$(expr $num_F / 2) # use integer math
     
     echo 
     echo "  Faces: $num_F" 
@@ -561,7 +562,7 @@ do_simplify() {
     echo "  Average Face Area (100 mm^2): "$(printf %.2f "$avg_face_area_100")
     echo ;
     echo "  Enter the target number of faces or hit enter to"
-    echo -n "accept the default (50% of current: \"$half_F\"): "
+    echo -n " accept the default ($half_F): "
     read faces
     if [ -z "$faces" ]; then
         faces="$half_F"
