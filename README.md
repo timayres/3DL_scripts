@@ -1,9 +1,10 @@
 
+#3DP Scripts - shell scripts to prepare 3D mesh models for 3D printing and script with MeshLab
 
 ##About
 This project consists of two main parts:
 
-1. For end users, a number of small interactive apps to perform helpful tasks on 3D unstructured triangular meshes, such as scaling, converting, and hollowing. These apps are command line based and are intended to be run by dragging and dropping a 3D mesh model onto the app. These apps make extensive use of part 2.
+1. For end users, a number of small interactive apps (the 3DP apps) to perform helpful tasks on 3D unstructured triangular meshes, such as scaling, converting, and hollowing. These apps are command line based and are intended to be run by dragging and dropping a 3D mesh model onto the app. These apps make extensive use of part 2.
 
 2. For programmers, an improved interface to generate and run meshlabserver xml filter scripts. No more exporting and hand editing .mlx files, now these can be generated straight from the command line.
 
@@ -11,11 +12,11 @@ This project is written primarily in [Bash](https://en.wikipedia.org/wiki/Bash_%
 
 
 ##History
-This project was created to automate many of the repetitive tasks involved with processing and preparing 3D scans with color textures (primarily of people) for 3D printing, although it is applicable to other use cases as well.
+This project was created to automate many of the repetitive tasks involved with processing and preparing 3D scans (primarily of people) with color textures for 3D printing, although it is applicable to other use cases as well.
 
-Although there are a growing number of tools to prepare models for 3D printing, many of these do not work with color or textures. In the Free software world [MeshLab](http://meshlab.sourceforge.net/) and [Blender](https://www.blender.org/) are the primary tools of choice for working with such models. Additional tools used include ADMesh and OpenSCAD, however these only work with STLs and are thus suitable for colorless geometry data only.
+Although there are a growing number of tools to prepare models for 3D printing, many of these do not work with color or textures. In the FLOSS software world [MeshLab](http://meshlab.sourceforge.net/) and [Blender](https://www.blender.org/) are the primary tools of choice for working with such models. Additional tools used include [OpenSCAD](http://www.openscad.org/) and [ADMesh](https://github.com/admesh/admesh), however these only work with STLs and are thus suitable for colorless geometry data only.
 
-While creating these programs, a simple yet improved interface to meshlabserver (the command line scripting version of MeshLab) was created. This may be useful to others (anyone who wants to script with MeshLab) even if the 3DP apps are not used.
+While creating these programs, a simple yet improved interface to meshlabserver (the command line scripting interface to MeshLab) was created. This may be useful to others (anyone who wants to script with MeshLab) even if the 3DP apps are not used.
 
 ##Status
 This code should be considered ALPHA quality at best. Interfaces and usage may change at any time, many planned features have not yet been implemented, some features have had little or no testing, any many bugs are surely waiting to be found. You have been warned! Still, even in its current state many features work well and reliably, so give it a shot!
@@ -23,7 +24,7 @@ This code should be considered ALPHA quality at best. Interfaces and usage may c
 #3DP APPS
 
 ##Metadata
-In order to automate some tasks the 3DP apps need to know additional metadata about the model that it cannot determine on its own; this includes the model's scale ratio and "up" axis. This metadata is added to the end of the file name (before the extension); it consists of a number and a letter enclosed in parentheses, such as "model(-10Y).obj" or "model(1Z).stl".
+In order to automate some tasks the 3DP apps need to know additional metadata about the model that it cannot determine on its own; this includes the model's scale ratio and "up" axis. This metadata is added to the end of the file name before the extension; it consists of a number and a letter enclosed in parentheses, such as "model(-10Y).obj" or "model(1Z).stl".
 
 - Scale Ratio: Particularly for 3D scans of real world subjects it is important to know how the size of the 3D model relates to reality. This number indicates the scale ratio of the model; this can be positive or negative, integer or float. Positive numbers greater than 1 indicate that the model is scaled up, e.g. "2" indicates the model is twice its original size. "1" indicates the model is original size (no scaling). Positive decimal numbers indicate that the model is scaled down, e.g. ".1" indicates that the model is one tenth (or 10%) its original size. Negative numbers indicate an inverse scale ratio, for example "-10" indicates that the model is at 1:10 (or 1/10) scale, which is also equivalent to ".1".
 - Up axis: an annoying fact of the 3D software world is that no one can agree on which way is up! Valid values are "Y" and "Z". Generally speaking, 3D modeling programs assume "Y" is up and 3D printing programs assume "Z" is up, however there are exceptions, and some software (such as Blender and Shapeways) assume a different orientation based on the file type.
@@ -31,7 +32,7 @@ In order to automate some tasks the 3DP apps need to know additional metadata ab
 When you use the 3DP apps they will prompt you for this metadata if it is needed but is not found; it is added to all output files automatically. You can also easily add it to your files with the 3DP_rename app.
 
 ##Units
-Model units are assumed to be in mm. This is true even if the file type specifies the units (such as X3D files, which are defined to be in meters). These units are reflected in the output of all measurements (such as length, area & volume), although in practice all operations are unitless.
+Model units are assumed to be in mm. This is true even if the file type specifies the units (such as X3D files, which are defined to be in meters). These units are reflected in the output of all measurements (length, area & volume), although in practice all operations are unitless.
 
 ##Supported file types
 The following two file types and options are primarily supported:
@@ -42,15 +43,15 @@ The following two file types and options are primarily supported:
 Additional formats supported in some way:
 
 - [x3d](https://en.wikipedia.org/wiki/X3D) - supports color textures, primarily used to submit models to Shapeways.
-- [xyz] - a simple format containing just a list of xyz vertices (a point cloud).
-- [dxf](https://en.wikipedia.org/wiki/AutoCAD_DXF) - a primarily 2D format, used here to export 2D planar sections.
+- xyz - a simple format containing just a list of xyz vertices (a point cloud).
+- [dxf](https://en.wikipedia.org/wiki/AutoCAD_DXF) - primarily a 2D format, used here to export 2D planar sections.
   
-Support for additional model types ([ply](https://en.wikipedia.org/wiki/PLY_%28file_format%29), [dae](https://en.wikipedia.org/wiki/COLLADA), etc.) is planned for the future, however for obvious reasons only formats supported by MeshLab can be added and likely only ASCII text formats can be fully supported. Note that based on the app additional input file types may work, but have not been tested.
+Support for additional model types ([ply](https://en.wikipedia.org/wiki/PLY_%28file_format%29), [dae](https://en.wikipedia.org/wiki/COLLADA), etc.) is planned for the future, however only formats supported by MeshLab can be added and likely only ASCII text formats can be fully supported. Note that based on the app additional input file types may work, but have not been tested.
 
-Note that vertex colors are not currently explicitly supported. They may work fine, however no testing has been done. Explicit support is planned for the future.
+Vertex colors are not currently explicitly supported. They may work fine, however no testing has been done. Explicit support is planned for the future.
 
 ##Licensing
-The original code in this repository is released under the LGPLv2.1. This means that you are free to use them as you please, and even use the various scripts and functions (such as mlx.bsh) in your own programs and scripts without being required to share your  scripts (but it would be nice). However, if you make any changes or improvements to the scripts and functions included here you need to share those changes back. 
+The original code in this repository is released under the LGPLv2.1. This means that you are free to use them as you please, and even use the various scripts and functions (such as mlx.bsh) in your own programs and scripts without being required to share your  scripts (but it would be nice). However, if you make any changes or improvements to the scripts and functions included here you need to share those changes back. Fair enough?
 
 mlx_scratch.bsh is an example & testing script & is released into the public domain.
 
@@ -58,9 +59,9 @@ Models in the test_models directory are licensed under the Creative Commons Attr
 
 Additional software that is include in this repository that we didn't write, but am extremely grateful for!
 
-funcs.bc
-Source: http://phodd.net/gnu-bc/
-License: not sure, but it is certainly freely available
+- funcs.bc
+  - Source: http://phodd.net/gnu-bc/
+  - License: not sure, but it is certainly freely available
 
 ## Installation & Dependencies
 ###Windows
@@ -70,9 +71,9 @@ You will need to manually install the required dependencies; if you install them
 - [OpenSCAD](http://www.openscad.org/) version 2015.03, C:/Program Files/OpenSCAD
 - [Cygwin](https://www.cygwin.com/), C:/cygwin64 (if different this location needs to be changed in 3DP-generate_apps.bsh, 3DP-generate_apps.cmd & 3DP-remove_apps.cmd)
   
-__Note that version 1.3.4BETA for 64 bit Windows is required.__ Older versions will mostly work but are missing some key features. Most notably, the measure_geometry & measure_topology filters do not work from meshlabserver in older versions (including 1.3.3), so any apps that depend on these will not work.
+__Note that version 1.3.4BETA for 64 bit Windows is required.__ Older versions will mostly work but are missing some key features. Most notably, the measure geometry & measure topology filters do not work from meshlabserver in older versions (including 1.3.3), so any apps that depend on these will not work.
   
-After installing Cygwin, you can run the file bash/3DP-cyg-install.bsh to automatically install additional dependencies within Cygwin. Note that this uses [apt-cyg](https://github.com/transcode-open/apt-cyg)
+After installing Cygwin, you can run the file bash/3DP-cyg-install.bsh to automatically install additional dependencies within Cygwin. Note that this uses [apt-cyg](https://github.com/transcode-open/apt-cyg) to install additional programs.
 
 
 ###Linux
@@ -84,15 +85,16 @@ In any case, the 3DP-generate_apps.bsh script should generate .desktop shortcuts
 OS X should work with a bit of work, again provided you can get an updated copy of MeshLab compiled & installed. However, I don't own a Mac and am unsure how to create files to support dragging & dropping, so you're on your own at the moment.
 
 ## App Brief Descriptions & Usage
+You should ensure that models are "clean" (manifold, no holes, etc.) before running these scripts or they may not work.
 
 - 3DP-2objNC - this will drop all color info from an obj file. Creates a new file with "NC" (for "no color") added to the end of the filename; the original is not changed. 'Cause sometimes you just want to deal with the geometry! Should work on any (mesh) input file MeshLab supports.
-- 3DP_2objz - this will take your obj file, find any associated .mtl material file and texture files and wrap them all together in a zip file. Useful for transferring the complete model (with color data) to another location or uploading to a 3D printing service (e.g. Sculpteo). Currently only works on obj files.
+- 3DP_2objz - this will take your obj file, find any associated .mtl material file and texture files and wrap them all together in a zip file. Useful for transferring the complete model (with color data) to another location or uploading to a 3D printing service (e.g. Sculpteo). Currently only works on obj files (it will not convert other formats).
 - 3DP-2stl - if a non-stl file is dropped on this app it will make sure it is Z up, convert it to stl, run it through ADMesh for checks & automatic cleaning & save it as an ASCII stl. If an stl is dropped on this it will still run it through ADMesh for checks & automatic cleaning. __Note that this will overwrite the original stl file with the ADMesh output.__ Usually this is perfectly safe and desirable, however if your model has severe issues that ADMesh can't fix this may make it worse. Should work on any (mesh) input file MeshLab supports.
-- 3DP-2x3dz - this will convert your model to x3d format, find any associated texture files,   wrap them all together in a zip file, and delete the x3d file. Primarily intended for submitting models to Shapeways. Should work on any (mesh) input file MeshLab supports. _NOTE: I've had issues with x3d for some models, so this is planned to be replaced with 2daez in the not too distant future._
+- 3DP-2x3dz - this will convert your model to x3d format, find any associated texture files,   wrap them all together in a zip file, and delete the x3d file. Primarily intended for submitting models to Shapeways. Should work on any (mesh) input file MeshLab supports. _NOTE: I've had issues with the x3d format for some models, so this is planned to be replaced with 2daez in the not too distant future._
 - 3DP-check_mesh - currently just measures geometry & topology of mesh. _Will be changed in the future._
-- 3DP-hollow - a rather complicated script to hollow models for binder jetting 3D printing, e.g. full color stone. A work in progress; expect significant changes in the future. Note that this currently doesn't actually hollow the model; instead it will create the interior "negative volume". You will still need to import the original model into Blender & perform a boolean difference with the negative volume to actually create a hollow model.
-- 3DP-pricing - calculates prices in full color stone for various 3D printing services; currently supports Shapeways & i.Materialize.
-- 3DP-rename - renames the model and any associated secondary files (e.g. materials & textures), which are tedious to rename on their own. You can also keep the current name and use this to just add metadata. Contains some special rules for handling models produced by itSeez3D. Create new files with the new name, but does not delete the original.
+- 3DP-hollow - a rather complicated script to hollow models for binder jetting 3D printing, e.g. full color stone. A work in progress; expect significant changes in the future. Note that this currently doesn't actually hollow the model; instead it will create the interior "negative volume". You will still need to import the original model into Blender & perform a boolean difference with the negative volume to actually create a hollow model. This app can currently hollow out the bottom of prints, create half-bust magnets, and bobbleheads (just the head). The model must be properly oriented before running the app.
+- 3DP-pricing - calculates prices in full color stone for various 3D printing services; currently supports Shapeways & i.Materialize. More services could be added as long as they publish their pricing formula.
+- 3DP-rename - renames the model and any associated secondary files (e.g. materials & textures), which are tedious to rename on their own. You can also keep the current name and use this to just add metadata. App creates new files with the new name, but does not delete the originals. Contains some special rules for handling models produced by itSeez3D.
 - 3DP-scale - will scale the model to a different scale ratio. Note that this scales the model based on the new scale ratio, not based on the current model size. For example, if you have a model at 1:10 and you want to make it twice as big, you would enter "-5" (to convert to 1:5 scale), not "2". Creates a new model with different metadata; the original is not changed.
 - 3DP-simplify - simplifies the model to a desired number of faces; automatically detects & supports textured models. Will create a new model with "-simp#K" appended to the filename, where "#" is the number of faces in thousands.
 - 3DP-swapYZ - swaps the "up" axis, e.g. from Y to Z or vice versa. In reality the model is simply rotated by 90° about the X axis. Creates a new model with different metadata; the original is not changed.
@@ -102,19 +104,19 @@ You should ensure that models are "clean" (2-manifold, no holes, etc.) before ru
 
 #mlx.bsh (meshlabserver interface)
 
-The mlx.bsh script contains functions to programmatically implement MeshLab filters via generation of MeshLab xml filter scripts (.mlx files). Thus, it is able to automate many of the tasks that you can perform in the MeshLab gui.
+The mlx.bsh script contains functions to programmatically run MeshLab filters via generation of MeshLab xml filter scripts (.mlx files). Thus, it is able to automate many of the tasks that you can perform in the MeshLab gui.
 
-One particular use case is to take measurements of a mesh to input into OpenSCAD; it is used in just this way in the file modeling.bsh. 
+One particular use case is to take measurements of a mesh to input into OpenSCAD; it is used in just this way in the script modeling.bsh (contains the hollowing functions).
 
 ## Usage
-The best documentation at the moment is likely to just read the code, however here is a general overview of how to use the functions to write your own scripts.
+Here is a general overview of how to use the functions to write your own scripts.
 
 First define the variable `ml_SF` with the filename of the script file you want to create, for example `temp.mlx`. WARNING: if this filename already exists it will be overwritten.
 
 ###Write the mlx script
 Functions that begin with `mlx` actually write xml code to the `ml_SF` filename.
 
-`mlx_begin` - must always be the first mlx function called. This writes the opening tags, and also adds `mlx_merge_V` for stl files (this is the same as selecting "Unify Duplicate Vertices" when importing STLs in tyhe gui).
+`mlx_begin` - must always be the first mlx function called. This writes the opening tags, and also adds `mlx_merge_V` for stl files (this is the same as selecting "Unify Duplicate Vertices" when importing STLs in the gui).
 `mlx_end` - must always be the last mlx function called; this writes the closing tag.
 
 Here's a sample script to scale a model to half size and move 1 mm down in the Z axis:
@@ -127,25 +129,45 @@ mlx_translate z=-1
 mlx_end
 ```
 
+###Filters
+Not all MeshLab filters have been implemented yet, however a useful subset has. It's reasonably straightforward to add additional filters, so it you need something extra please send a request! Currently the best documentation on implemented filters and their usage is the code itself.
+
+mlx.bsh uses a few abbreviations to shorten names for common words:
+- V = vertex, vertexes, vertices
+- E = edge, edges
+- F = face, faces, facets
+- sel = select, selected
+- del = delete, deleted
+- parts = same as "components" in MeshLab (but fewer letters ;); some other programs call these "shells". These are any separate, unconnected geometries in the mesh.
+- layer = MeshLab uses "layer" and "mesh" somewhat interchangeably. This isn't entirely correct, as a layer could contain something other than a mesh (e.g. a point cloud), so the more general term is used.
+
+MeshLab likes to give filters long and highly technical names; wile accurate, this can be confusing for newcomers (and some oldtimers ;), and is a bit much to type out in scripts. Therefore, some filters have been renamed to give them shorter (and hopefully clearer) names. For example, filter "Quadric Edge Collapse Decimation" is called with the function `mlx_simplify`.
+
+Additional filter combinations are also included for convenience. For example, `mlx_del_small_parts` combines `mlx_sel_small_parts` with `mlx_del_sel_V_F`. 
+
+Some filters have additional features added or a different interface defined. For example, `mlx_simplify` will run a different version of the filter depending if the model has a UV texture. The mesh creation filters have been changed extensively to give them more of an OpenSCAD-like interface.
+
+All filter opens are specified when calling the filter using the pattern `option=value`. Read the code to see specifics. All options that are available can be specified unless they serve no purpose in a script (such as the rotation snap angle). All options have default values so it is not required to specify any options at all (although for some filters such as the transformations a call with no options won't actually do anything). Please note that the default values are those we've found to be the most useful and may differ from MeshLab's defaults. Check first!
+
 ###Run the script in meshlabserver
-You have two options to run scripts, the `run_meshlab` function or just calling meshlabserver directly.
+You have two options to run mlx scripts, the `run_meshlab` function or just calling meshlabserver directly.
 
 ####run_meshlab
-`run_meshlab` adds a few features and conveniences, such as the ability to silence meshlab's output, track its run time, and automatically determine file output options. The current downside is that not all meshlabserver features are currently supported, so if you need these features meshlabserver is your only option. To use `run_meshlab` you need to define the following variables first:
+`run_meshlab` adds a few features and conveniences, such as the ability to silence meshlab's output, track its run time, and automatically determine file output options. The  downside is that not all meshlabserver features are currently supported, so if you need these features meshlabserver is your only option. To use `run_meshlab` you need to define the following variables first:
 
-ml_IF = MeshLab input filename - required
-ml_OF = MeshLab output filename - optional
-ml_LF = MeshLab log filename - optional
+- `ml_IF` = MeshLab input filename - required (see note below)
+- `ml_OF` = MeshLab output filename - optional
+- `ml_LF` = MeshLab log filename - optional
 
 There are several features which are currently NOT supported:
 - Output file types other than those listed above. Note that most input file types should be fine.
 - Output options that are not yet supported, such as vertex colors without textures.
-- MeshLab project files
-- Multiple input files
-- Multiple output files
+- MeshLab project files.
+- Multiple input files.
+- Multiple output files.
 
 ####meshlabserver
-Here is a copy of meshlabserver's Usage:
+meshlabserver's Usage (run `meshlabserver` with no options to see this):
 ```
 meshlabserver [logargs] [args]
   where logargs can be:
@@ -216,7 +238,7 @@ meshlabserver [logargs] [args]
 Additional notes on usage:
 - The `-d` flag causes a seg fault with v1.3.4BETA
 - You must supply an input file, even if you don't want one (i.e. you are creating a new mesh). No input file causes a seg fault with v1.3.4BETA. A workaround is to import a simple mesh such as `test_models/PLANE.obj` and run `mlx_del_layer` immediately after `mlx_begin`.
-- `-w proj.mlp` will export all layers as separate mesh files in ply format; the layer labels are the filenames.
+- `-w proj.mlp` will export all layers as separate mesh files; the layer labels are the filenames. For non-imported meshes the default export format is ply.
 - You can specify multiple output filenames with multiple -o instances, however this will still be the same (current) layer. This is useful for outputting a layer in multiple file formats in the same command.
 
 
