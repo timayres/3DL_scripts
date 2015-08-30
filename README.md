@@ -66,6 +66,8 @@ Additional software that is include in this repository that we didn't write, but
 
 ## Installation & Dependencies
 ###Windows
+Download the repository and put it wherever you like.
+
 You will need to manually install the required dependencies; if you install them in a location different than described below you will need to edit the file "3DP-main.bsh" with the new locations.
 - [MeshLab](http://meshlab.sourceforge.net/) version 1.34BETA, C:/Program Files/VCG/MeshLab
 - [ADMesh](https://github.com/admesh/admesh) version 0.98.2, C:/Program Files/admesh
@@ -76,14 +78,15 @@ __Note that version 1.3.4BETA for 64 bit Windows is required.__ Older versions w
   
 After installing Cygwin, you can run the file bash/3DP-cyg-install.bsh to automatically install additional dependencies within Cygwin. Note that this uses [apt-cyg](https://github.com/transcode-open/apt-cyg) to install additional programs.
 
+To generate the app shortcuts, doubleclick on bash/3DP-generate_apps.cmd. This will generate cmd files in the top directory suitable for dragging & dropping models on.
 
 ###Linux
 Linux is kinda sorta supported; I've actually given up on supporting Linux at the moment since it's just too hard to get the latest versions of software installed. For example, as of this writing (August 2015) the latest version of Meshlab packaged with Ubuntu (15.04) is 1.3.2, released over 3 years ago. There's a PPA for 1.3.3 but it's missing features. As noted above, MeshLab version 1.3.4BETA is needed for full support, however this was never released for Linux (even in source form), so what's needed is to compile a later version from SVN. 
 
-In any case, the 3DP-generate_apps.bsh script should generate .desktop shortcuts that you can drag & drop models onto. If you can get a later version of MeshLab compiled it should work, or you can live with the reduced functionality of older versions.
+In any case, after installing all dependencies run bash/3DP-generate_apps.bsh script to generate .desktop shortcuts that you can drag & drop models onto. If you can get a later version of MeshLab compiled it should work, or you can live with the reduced functionality of older versions.
 
 ###OS X
-OS X should work with a bit of work, again provided you can get an updated copy of MeshLab compiled & installed. However, I don't own a Mac and am unsure how to create files to support dragging & dropping, so you're on your own at the moment.
+OS X should work with a bit of work, again provided you can get an updated copy of MeshLab compiled & installed. However, I don't own a Mac and am unsure how to create files to support dragging & dropping, so you're on your own at the moment. Contributions welcome!
 
 ## App Brief Descriptions & Usage
 You should ensure that models are "clean" (manifold, no holes, etc.) before running these scripts or they may not work.
