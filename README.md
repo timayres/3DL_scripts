@@ -1,5 +1,6 @@
 
-#3DP Scripts - shell scripts to prepare 3D mesh models for 3D printing and script with MeshLab
+#3DP Scripts
+Shell scripts to prepare 3D mesh models for 3D printing and script with MeshLab
 
 ##About
 This project consists of two main parts:
