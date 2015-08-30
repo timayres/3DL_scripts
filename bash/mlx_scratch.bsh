@@ -91,27 +91,47 @@ fi
 
 # TODO: test out mlp files; can you output multiple files?
 
-# Create a target!
-if [  ]; then
+# Create Captain America's shield!
+if [ 1 ]; then
     fn=50
     ml_IF="$fbase"
-    ml_SF="TEMP3DP_target.mlx"
-    ml_OF="target.obj"
+    ml_SF="TEMP3DP_shield.mlx"
+    ml_OF="shield.obj"
     mlx_begin
     mlx_del_layer
-    mlx_circle r=1
-    mlx_per_V_color_func r=255
-    mlx_circle r1=2 r2=1
+    
+    # Create star by scaling 5 squares into diamonds & rotating around
+    r=2 # radius of circumscribing circle
+    p=$(bc -l ${scriptpath}/funcs.bc <<< "scale=10;($r/(1 + tan(36*pi()/180)/tan(18*pi()/180)))") # distance from center to pentagon edge
+    w=$(bc -l ${scriptpath}/funcs.bc <<< "scale=10;($p*tan(36*pi()/180))") # 1/2 width pentagon edge/outer triangle bottom
+    h=$(bc -l ${scriptpath}/funcs.bc <<< "scale=10;($w/tan(18*pi()/180))") # height of outer triangle
+
+    for ((i=1; i <= 5 ; i++)); do
+        mlx_square s=$(bc <<< "scale=10;(sqrt(2))") center=true # create square so length from center to vertices is 1, so side length of sqrt(2)
+        mlx_rotate z=45
+        mlx_scale x=$w y=$h
+        mlx_translate y=$p
+        mlx_rotate z=$(bc <<< "scale=10;($i*72)")
+    done
+    mlx_flatten_layers # flatten star
+    mlx_translate z=.001 # translate start up slightly so it doesn't overlap circle
+    
+    mlx_circle r=2
+    mlx_color_V b=255
     mlx_circle r1=3 r2=2
-    mlx_per_V_color_func r=255
+    mlx_color_V r=255
     mlx_circle r1=4 r2=3
     mlx_circle r1=5 r2=4
-    mlx_per_V_color_func r=255
+    mlx_color_V r=255
+    
     mlx_flatten_layers
     mlx_end
     
-    #TODO: try this without an input file
-    #meshlabserver -o "$ml_OF" -m vn vc  -s "$ml_SF"
+    # no input files does not work; seg faults 1.3.4BETA
+    # -w proj.mlp does export multiple files with the layer labels as the names
+    #  you can specify both an mlp out and an -o out; -o outputs the current layer as always
+    # if you specify multiple -o files it still just outputs the current layer, however this can be used to output different file types at the same time
+    #meshlabserver -i "$ml_IF" -w test.mlp -o test.obj -m vn vc -o test2.xyz -s "$ml_SF"
     meshlabserver -i "$ml_IF" -o "$ml_OF" -m vn vc  -s "$ml_SF"
     return_code=$?
     if [ $return_code -ne 0 ]; then
@@ -119,7 +139,8 @@ if [  ]; then
     fi
 fi
 
-if [ 1 ]; then
+# test out various functions before adding them to 3DP-generate_apps.bsh
+if [  ]; then
 
 do_half_bust_FFF "$fbase"
 
@@ -279,13 +300,6 @@ if [  ]; then
     # OIFS="$IFS"; IFS=,; my_path_scad="[${my_path[*]}]"; IFS="$OIFS"
     # echo "$my_path_scad"
 
-fi
-
-
-if [  ]; then
-    echo ; echo -n "Drop a file here, what happens?"
-    read file
-    echo "$file"
 fi
 
 if [  ]; then

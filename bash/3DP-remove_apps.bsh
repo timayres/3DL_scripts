@@ -1,5 +1,5 @@
 #!/bin/bash
-#license: GPLv2
+#license: LGPLv2.1
 # 3DP-generate_windows_scripts.bsh
 # generate windows & cygwin scripts
 

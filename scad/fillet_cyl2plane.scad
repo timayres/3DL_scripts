@@ -1,4 +1,5 @@
 
+// License: LGPLv2.1
 
 fillet_rad=3;
 cyl_rad=2.5;

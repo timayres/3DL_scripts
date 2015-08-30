@@ -1,6 +1,6 @@
 #!/bin/bash
 #measure.bsh
-#license: GPLv2
+#license: LGPLv2.1
 #functions to perform measurements on the mesh
 # filters are based on MeshLab v 1.3.4BETA for 64 bit Windows
 

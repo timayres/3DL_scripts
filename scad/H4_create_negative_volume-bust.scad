@@ -13,6 +13,8 @@ orig_ymax=13.160800;
 orig_zmin=-0.672300;
 orig_zmax=43.146698;
 /**********CUT LINE**********/
+// Everything above this line will be replaced by calling script
+// License: LGPLv2.1
 
 //Calculations
 orig_xsize=orig_xmax-orig_xmin;

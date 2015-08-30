@@ -16,6 +16,8 @@ orig_ymax=13.762821;
 orig_zmin=-8.115490;
 orig_zmax=49.965370;
 /**********CUT LINE**********/
+// Everything above this line will be replaced by calling script
+// License: LGPLv2.1
 
 magnet_x_pos=0;//-2.5; // TWEAK THIS to center magnet if needed
 top_slot_x_pos=0;//-2.5; // TWEAK THIS to center top hanging slot if needed

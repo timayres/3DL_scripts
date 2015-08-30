@@ -1,6 +1,6 @@
 #!/bin/bash
 #3DP-generate_windows_scripts.bsh
-#license: GPLv2
+#license: LGPLv2.1
 # generate windows & cygwin scripts
 
 gen_mlx_scratch_shortcuts="true"

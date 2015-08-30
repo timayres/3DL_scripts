@@ -1,6 +1,6 @@
 #!/bin/bash
 #3DP-main.bsh
-#license: GPLv2
+#license: LGPLv2.1
 #version="alpha"
 
 # TODO: update test_model, update scad files to reference it. Use 1:8 model so it works with half-bust.
@@ -90,6 +90,29 @@ else
     unixpath="$1"
 fi
 
+parse_metadata () {
+    fpref_full="${1%.*}" # full file prefix, including metadata
+    
+    metadata=$(echo "$fpref_full" | awk -F '[)(]' '{print $(NF-1)}') # prints last field enclosed in parentheses (second to last field matched)
+    
+    if [ "$fpref_full" = "$metadata" ]; then
+        fpref=$(echo "$fpref_full" | cut -d"." -f1) # file prefix without metadata
+        #fpref=$(echo "${1%.*}" | cut -d"." -f1) # file prefix without metadata
+        m_scale=$(echo "$fpref_full" | cut -d"." -f2)
+        m_up=$(echo "$fpref_full" | cut -d"." -f3)
+        #m_color=$(echo "$fpref_full" | cut -d"." -f4)
+        #m_solid=$(echo "$fpref_full" | cut -d"." -f5)
+    else
+        m_scale=${metadata:: -1} # strip last character
+        #cut last character echo ${foo%?}
+        m_up=${metadata: -1} # return only last character
+        #fpref=$(echo "$fpref_full" | awk -F '[)(]' '{$NF=$(NF-1)=""; print $0}')
+        #fpref="${fpref// /}" # strip all whitespace, including any interior spaces
+        #fpref=$(trim "$fpref")
+        fpref="${fpref_full%(*}" #cut out everything beyond last "("
+    fi
+}
+
 ### Begin Find file paths
 scriptpath="$(cd "$(dirname "$0")"; pwd -P)" # path of this script file
 #use ${scriptpath%/*} to get parent directory
@@ -99,7 +122,7 @@ fbase="${unixpath##*/}" # file basename (prefix+extension)
 parse_metadata "$fbase" # set initial fpref_full, fpref, m_scale, m_up
 
 if [ "$verbosity" -ge 6 ]; then
-    echo ; echo scriptpath = "$scriptpath"; echo unixpath="$unixpath"; echo fpath="$fpath"; echo fbase="$fbase"; echo fpref_full="$fpref_full"; echo fext="$fext"; echo ML_VERSION="$ML_VERSION"
+    echo ; echo scriptpath = "$scriptpath"; echo unixpath="$unixpath"; echo fpath="$fpath"; echo fbase="$fbase"; echo fpref_full="$fpref_full"; echo ML_VERSION="$ML_VERSION"
 fi
 ### End Find file paths
 
@@ -286,29 +309,6 @@ do_metadata () {
         echo meta = "$meta"
     fi
     return 0
-}
-
-parse_metadata () {
-    fpref_full="${1%.*}" # full file prefix, including metadata
-    
-    metadata=$(echo "$fpref_full" | awk -F '[)(]' '{print $(NF-1)}') # prints last field enclosed in parentheses (second to last field matched)
-    
-    if [ "$fpref_full" = "$metadata" ]; then
-        fpref=$(echo "$fpref_full" | cut -d"." -f1) # file prefix without metadata
-        #fpref=$(echo "${1%.*}" | cut -d"." -f1) # file prefix without metadata
-        m_scale=$(echo "$fpref_full" | cut -d"." -f2)
-        m_up=$(echo "$fpref_full" | cut -d"." -f3)
-        #m_color=$(echo "$fpref_full" | cut -d"." -f4)
-        #m_solid=$(echo "$fpref_full" | cut -d"." -f5)
-    else
-        m_scale=${metadata:: -1} # strip last character
-        #cut last character echo ${foo%?}
-        m_up=${metadata: -1} # return only last character
-        #fpref=$(echo "$fpref_full" | awk -F '[)(]' '{$NF=$(NF-1)=""; print $0}')
-        #fpref="${fpref// /}" # strip all whitespace, including any interior spaces
-        #fpref=$(trim "$fpref")
-        fpref="${fpref_full%(*}" #cut out everything beyond last "("
-    fi
 }
 
 set_meta() {

@@ -17,6 +17,8 @@ orig_ymax=13.165529;
 orig_zmin=-0.675376;
 orig_zmax=43.144764;
 /**********CUT LINE**********/
+// Everything above this line will be replaced by calling script
+// License: LGPLv2.1
 
 //embedded variables
 eps=0.00001; //overlap amount for correct booleans

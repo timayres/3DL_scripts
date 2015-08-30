@@ -1,6 +1,6 @@
 #!/bin/bash
 #hollow.bsh
-#license: GPLv2
+#license: LGPLv2.1
 
 # TODO: correct m_up in half bust to Y after step 1
 # TODO: add back in steps 2 & 3, adding an inset rim and a single hole

@@ -22,6 +22,8 @@ ymax=17.254002;
 zmin=-0.096819;
 zmax=65.188004;
 /**********CUT LINE**********/
+// Everything above this line will be replaced by calling script
+// License: LGPLv2.1
 
 //embedded variables
 eps=0.00001; //overlap amount for correct booleans

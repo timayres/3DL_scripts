@@ -2246,7 +2246,7 @@ mlx_sampling_pd() { # Poisson-disk Sampling
 
 # TODO: test out using a function
 # It's possible to use the following per-vertex variables in the expression: x, y, z, nx, ny, nz (normal), r, g, b (color), q (quality), rad, vi (index), vtu, vtv (tex coord) and all custom vertex attributes already defined by user.
-mlx_per_V_color_func() {
+mlx_color_V() {
     # Options & Defaults
     local r=0 # Function to generate Red component. Expected Range 0-255
     local g=0 # Function to generate Green component. Expected Range 0-255
