@@ -144,7 +144,7 @@ Here is a copy of meshlabserver's Usage:
 meshlabserver [logargs] [args]
   where logargs can be:
     -d filename             dump on a text file a list of all the
-                            filtering functions - doesn't work! seg faults
+                            filtering functions
     -l filename             log of the filters is output on a file
   where args can be:
     -p filename             meshlab project (.mlp) to be loaded
@@ -209,11 +209,8 @@ meshlabserver [logargs] [args]
 
 Additional notes on usage:
 - The `-d` flag causes a seg fault with v1.3.4BETA
-- You must supply an input file, even if you don't want one (i.e. you are creating a new mesh). A workaround is to import a simple mesh such as `test_models/PLANE.obj` and run `mlx_del_layer` immediately after `mlx_begin`.
-- 
-    # no input files does not work; seg faults 1.3.4BETA
-    # -w proj.mlp does export multiple files with the layer labels as the names
-    #  you can specify both an mlp out and an -o out; -o outputs the current layer as always
-    # if you specify multiple -o files it still just outputs the current layer, however this can be used to output different file types at the same time
-    #meshlabserver -i "$ml_IF" -w test.mlp -o test.obj -m vn vc -o test2.xyz -s "$ml_SF"
+- You must supply an input file, even if you don't want one (i.e. you are creating a new mesh). No input file causes a seg fault with v1.3.4BETA. A workaround is to import a simple mesh such as `test_models/PLANE.obj` and run `mlx_del_layer` immediately after `mlx_begin`.
+- `-w proj.mlp` will export all layers as separate mesh files in ply format; the layer labels are the filenames.
+- You can specify multiple output filenames with multiple -o instances, however this will still be the same (current) layer. This is useful for outputting a layer in multiple file formats in the same command.
+
 
