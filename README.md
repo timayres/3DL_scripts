@@ -33,13 +33,13 @@ In order to automate some tasks the 3DP apps need to know additional metadata ab
 When you use the 3DP apps they will prompt you for this metadata if it is needed but is not found; it is added to all output files automatically. You can also easily add it to your files with the 3DP_rename app.
 
 ##Units
-Model units are assumed to be in mm. This is true even if the file type specifies the units (such as X3D files, which are defined to be in meters). These units are reflected in the output of all measurements (length, area & volume), although in practice all operations are unitless.
+Model units are assumed to be in mm. This is true even if the file type specifies the units (such as x3d files, which are defined to be in meters). These units are reflected in the output of all measurements (length, area & volume), although in practice all operations are unitless.
 
 ##Supported file types
 The following two file types and options are primarily supported:
 
 - [obj](https://en.wikipedia.org/wiki/Wavefront_.obj_file) - for models with color texture data (UV mapping). Obj is a nice format, easily human readable, and enjoys widespread support (second only to stl).
-- [stl](https://en.wikipedia.org/wiki/STL_%28file_format%29) - for geometry data only (no color). Stl has the absolutely widest support. Note that there are some color extensions to stl, however these are not widely support, and we do not attempt to support them either. If you want color IMO you're better off using a better format.
+- [stl](https://en.wikipedia.org/wiki/STL_%28file_format%29) - for geometry data only (no color). Stl has the widest support. Note that there are some color extensions to stl, however these are not widely supported and we do not attempt to support them either. If you want color IMO you're better off using a better format.
   
 Additional formats supported in some way:
 
@@ -52,7 +52,7 @@ Support for additional model types ([ply](https://en.wikipedia.org/wiki/PLY_%28f
 Vertex colors are not currently explicitly supported. They may work fine, however no testing has been done. Explicit support is planned for the future.
 
 ##Licensing
-The original code in this repository is released under the LGPLv2.1. This means that you are free to use them as you please, and even use the various scripts and functions (such as mlx.bsh) in your own programs and scripts without being required to share your  scripts (but it would be nice). However, if you make any changes or improvements to the scripts and functions included here you need to share those changes back. Fair enough?
+The original code in this repository is released under the LGPLv2.1. This means that you are free to use them as you please, and even use the various scripts and functions (such as mlx.bsh) in your own programs and scripts without being required to share your code (but it would be nice). However, if you make any changes or improvements to the scripts and functions included here you need to share those changes back. Fair enough?
 
 mlx_scratch.bsh is an example & testing script & is released into the public domain.
 
@@ -76,14 +76,14 @@ You will need to manually install the required dependencies; if you install them
   
 __Note that version 1.3.4BETA for 64 bit Windows is required.__ Older versions will mostly work but are missing some key features. Most notably, the measure geometry & measure topology filters do not work from meshlabserver in older versions (including 1.3.3), so any apps that depend on these will not work.
   
-After installing Cygwin, you can run the file bash/3DP-cyg-install.bsh to automatically install additional dependencies within Cygwin. Note that this uses [apt-cyg](https://github.com/transcode-open/apt-cyg) to install additional programs.
+After installing Cygwin, you can run the file `bash/3DP-cyg-install.bsh` to automatically install additional dependencies within Cygwin. Note that this uses [apt-cyg](https://github.com/transcode-open/apt-cyg) to install additional programs.
 
-To generate the app shortcuts, doubleclick on bash/3DP-generate_apps.cmd. This will generate cmd files in the top directory suitable for dragging & dropping models on.
+To generate the app shortcuts, double click on `bash/3DP-generate_apps.cmd`. This will generate cmd files in the top directory suitable for dragging & dropping models on.
 
 ###Linux
-Linux is kinda sorta supported; I've actually given up on supporting Linux at the moment since it's just too hard to get the latest versions of software installed. For example, as of this writing (August 2015) the latest version of Meshlab packaged with Ubuntu (15.04) is 1.3.2, released over 3 years ago. There's a PPA for 1.3.3 but it's missing features. As noted above, MeshLab version 1.3.4BETA is needed for full support, however this was never released for Linux (even in source form), so what's needed is to compile a later version from SVN. 
+Linux is kinda sorta supported; I've actually given up on fully supporting Linux at the moment since it's just too hard to get the latest versions of software installed. For example, as of this writing (August 2015) the latest version of Meshlab packaged with Ubuntu (15.04) is 1.3.2, released over 3 years ago. There's a PPA for 1.3.3 but it's missing features. As noted above, MeshLab version 1.3.4BETA is needed for full support, however this was never released for Linux (even in source form), so what's needed is to compile a later version from SVN (but not TOO late or you'll encounter breakage). 
 
-In any case, after installing all dependencies run bash/3DP-generate_apps.bsh script to generate .desktop shortcuts that you can drag & drop models onto. If you can get a later version of MeshLab compiled it should work, or you can live with the reduced functionality of older versions.
+In any case, after installing all dependencies run `bash/3DP-generate_apps.bsh` script to generate .desktop shortcuts that you can drag & drop models onto. If you can get a later version of MeshLab compiled it should work, or you can live with the reduced functionality of older versions.
 
 ###OS X
 OS X should work with a bit of work, again provided you can get an updated copy of MeshLab compiled & installed. However, I don't own a Mac and am unsure how to create files to support dragging & dropping, so you're on your own at the moment. Contributions welcome!
@@ -91,20 +91,18 @@ OS X should work with a bit of work, again provided you can get an updated copy 
 ## App Brief Descriptions & Usage
 You should ensure that models are "clean" (manifold, no holes, etc.) before running these scripts or they may not work.
 
-- 3DP-2objNC - this will drop all color info from an obj file. Creates a new file with "NC" (for "no color") added to the end of the filename; the original is not changed. 'Cause sometimes you just want to deal with the geometry! Should work on any (mesh) input file MeshLab supports.
-- 3DP_2objz - this will take your obj file, find any associated .mtl material file and texture files and wrap them all together in a zip file. Useful for transferring the complete model (with color data) to another location or uploading to a 3D printing service (e.g. Sculpteo). Currently only works on obj files (it will not convert other formats).
-- 3DP-2stl - if a non-stl file is dropped on this app it will make sure it is Z up, convert it to stl, run it through ADMesh for checks & automatic cleaning & save it as an ASCII stl. If an stl is dropped on this it will still run it through ADMesh for checks & automatic cleaning. __Note that this will overwrite the original stl file with the ADMesh output.__ Usually this is perfectly safe and desirable, however if your model has severe issues that ADMesh can't fix this may make it worse. Should work on any (mesh) input file MeshLab supports.
-- 3DP-2x3dz - this will convert your model to x3d format, find any associated texture files,   wrap them all together in a zip file, and delete the x3d file. Primarily intended for submitting models to Shapeways. Should work on any (mesh) input file MeshLab supports. _NOTE: I've had issues with the x3d format for some models, so this is planned to be replaced with 2daez in the not too distant future._
-- 3DP-check_mesh - currently just measures geometry & topology of mesh. _Will be changed in the future._
-- 3DP-hollow - a rather complicated script to hollow models for binder jetting 3D printing, e.g. full color stone. A work in progress; expect significant changes in the future. Note that this currently doesn't actually hollow the model; instead it will create the interior "negative volume". You will still need to import the original model into Blender & perform a boolean difference with the negative volume to actually create a hollow model. This app can currently hollow out the bottom of prints, create half-bust magnets, and bobbleheads (just the head). The model must be properly oriented before running the app.
-- 3DP-pricing - calculates prices in full color stone for various 3D printing services; currently supports Shapeways & i.Materialize. More services could be added as long as they publish their pricing formula.
-- 3DP-rename - renames the model and any associated secondary files (e.g. materials & textures), which are tedious to rename on their own. You can also keep the current name and use this to just add metadata. App creates new files with the new name, but does not delete the originals. Contains some special rules for handling models produced by itSeez3D.
-- 3DP-scale - will scale the model to a different scale ratio. Note that this scales the model based on the new scale ratio, not based on the current model size. For example, if you have a model at 1:10 and you want to make it twice as big, you would enter "-5" (to convert to 1:5 scale), not "2". Creates a new model with different metadata; the original is not changed.
-- 3DP-simplify - simplifies the model to a desired number of faces; automatically detects & supports textured models. Will create a new model with "-simp#K" appended to the filename, where "#" is the number of faces in thousands.
-- 3DP-swapYZ - swaps the "up" axis, e.g. from Y to Z or vice versa. In reality the model is simply rotated by 90° about the X axis. Creates a new model with different metadata; the original is not changed.
-- mlx_scratch - a scratch file for development or writing your own scripts. Contains some sample code, including a silly script to generate Captain America's shield entirely in Meshlab vertex colored 2D surfaces.
-
-You should ensure that models are "clean" (2-manifold, no holes, etc.) before running these scripts or they may not work.
+- _3DP-2objNC_ - this will drop all color info from an obj file. Creates a new file with "NC" (for "no color") added to the end of the filename; the original is not changed. 'Cause sometimes you just want to deal with the geometry! Should work on any (mesh) input file MeshLab supports.
+- _3DP_2objz_ - this will take your obj file, find any associated .mtl material file and texture files and wrap them all together in a zip file. Useful for transferring the complete model (with color data) to another location or uploading to a 3D printing service (e.g. Sculpteo). Currently only works on obj files (it will not convert other formats).
+- _3DP-2stl_ - if a non-stl file is dropped on this app it will make sure it is Z up, convert it to stl, run it through ADMesh for checks & automatic cleaning & save it as an ASCII stl. If an stl is dropped on this it will still run it through ADMesh for checks & automatic cleaning. __Note that this will overwrite the original stl file with the ADMesh output.__ Usually this is perfectly safe and desirable, however if your model has severe issues that ADMesh can't fix this may make it worse. Should work on any (mesh) input file MeshLab supports.
+- _3DP-2x3dz_ - this will convert your model to x3d format, find any associated texture files,   wrap them all together in a zip file, and delete the x3d file. Primarily intended for submitting models to Shapeways. Should work on any (mesh) input file MeshLab supports. _NOTE: I've had issues with the x3d format for some models, so this is planned to be replaced with 2daez in the not too distant future._
+- _3DP-check_mesh_ - currently just measures geometry & topology of mesh. _Will be changed in the future._
+- _3DP-hollow_ - a rather complicated script to hollow models for binder jetting 3D printing, e.g. full color stone. A work in progress; expect significant changes in the future. Note that this currently doesn't actually hollow the model; instead it will create the interior "negative volume". You will still need to import the original model into Blender & perform a boolean difference with the negative volume to actually create a hollow model. This app can currently hollow out the bottom of prints, create half-bust magnets, and bobbleheads (just the head). The model must be properly oriented before running the app.
+- _3DP-pricing_ - calculates prices in full color stone for various 3D printing services; currently supports Shapeways & i.Materialize. More services could be added as long as they publish their pricing formula (for example, Sculpteo doesn't).
+- _3DP-rename_ - renames the model and any associated secondary files (e.g. materials & textures), which are tedious to rename on their own. You can also keep the current name and use this to just add metadata. App creates new files with the new name, but does not delete the originals. Contains some special rules for handling models produced by itSeez3D.
+- _3DP-scale_ - will scale the model to a different scale ratio. Note that this scales the model based on the new scale ratio, not based on the current model size. For example, if you have a model at 1:10 and you want to make it twice as big, you would enter "-5" (to convert to 1:5 scale), not "2". Creates a new model with different metadata; the original is not changed.
+- _3DP-simplify_ - simplifies the model to a desired number of faces; automatically detects & supports textured models. Will create a new model with "-simp#K" appended to the filename, where "#" is the number of faces in thousands.
+- _3DP-swapYZ_ - swaps the "up" axis, e.g. from Y to Z or vice versa. In reality the model is simply rotated by 90° about the X axis. Creates a new model with different metadata; the original is not changed.
+- _mlx_scratch_ - a scratch file for development or writing your own scripts. Contains some sample code, including a silly script to generate Captain America's shield entirely in Meshlab vertex colored 2D surfaces.
 
 #mlx.bsh (meshlabserver interface)
 
