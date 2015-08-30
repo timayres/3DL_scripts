@@ -2,7 +2,9 @@
 
 ##About
 This project consists of two main parts:
+
 1. For end users, a number of small interactive apps to perform helpful tasks on 3D unstructured triangular meshes, such as scaling, converting, and hollowing. These apps are command line based and are intended to be run by dragging and dropping a 3D mesh model onto the app. These apps make extensive use of part 2.
+
 2. For programmers, an improved interface to generate and run meshlabserver xml filter scripts. No more exporting and hand editing .mlx files, now these can be generated straight from the command line.
 
 This project is written primarily in [Bash](https://en.wikipedia.org/wiki/Bash_%28Unix_shell%29), the Unix shell scripting language, however it also (in fact, primarily) runs on Windows via Cygwin. These scripts use various other programs to do most of the heavy lifting.
@@ -22,8 +24,10 @@ This code should be considered ALPHA quality at best. Interfaces and usage may c
 
 ##Metadata
 In order to automate some tasks the 3DP apps need to know additional metadata about the model that it cannot determine on its own; this includes the model's scale ratio and "up" axis. This metadata is added to the end of the file name (before the extension); it consists of a number and a letter enclosed in parentheses, such as "model(-10Y).obj" or "model(1Z).stl".
+
   -Scale Ratio: Particularly for 3D scans of real world subjects it is important to know how the size of the 3D model relates to reality. This number indicates the scale ratio of the model; this can be positive or negative, integer or float. Positive numbers greater than 1 indicate that the model is scaled up, e.g. "2" indicates the model is twice its original size. "1" indicates the model is original size (no scaling). Positive decimal numbers indicate that the model is scaled down, e.g. ".1" indicates that the model is one tenth (or 10%) its original size. Negative numbers indicate an inverse scale ratio, for example "-10" indicates that the model is at 1:10 (or 1/10) scale, which is also equivalent to ".1".
-  -Up axis: an annoying fact of the 3D software world is that no one can agree on which way is up! Valid values are "Y" and "Z". Generally speaking, 3D modeling programs assume "Y" is up and 3D printing programs assume "Z" is up, however there are exceptions, and some software (such as Blender and Shapeways) assume a different orientation based on the file type. 
+  -Up axis: an annoying fact of the 3D software world is that no one can agree on which way is up! Valid values are "Y" and "Z". Generally speaking, 3D modeling programs assume "Y" is up and 3D printing programs assume "Z" is up, however there are exceptions, and some software (such as Blender and Shapeways) assume a different orientation based on the file type.
+  
 When you use the 3DP apps they will prompt you for this metadata if it is needed but is not found; it is added to all output files automatically. You can also easily add it to your files with the 3DP_rename app.
 
 ##Units
@@ -31,10 +35,12 @@ Model units are assumed to be in mm. This is true even if the file type specifie
 
 ##Supported file types
 The following two file types and options are primarily supported:
+
   -[.obj](https://en.wikipedia.org/wiki/Wavefront_.obj_file) - for models with color texture data (UV mapping). Obj is a nice format, easily human readable, and enjoys widespread support (second only to stl).
   -[.stl](https://en.wikipedia.org/wiki/STL_%28file_format%29) - for geometry data only (no color). Stl has the absolutely widest support. Note that there are some color extensions to stl, however these are not widely support, and we do not attempt to support them either. If you want color IMO you're better off using a better format.
   
 Additional formats supported in some way:
+
   -[.x3d](https://en.wikipedia.org/wiki/X3D) - supports color textures, primarily used to submit models to Shapeways.
   -[.xyz] - a simple format containing just a list of xyz vertices (a point cloud).
   -[.dxf](https://en.wikipedia.org/wiki/AutoCAD_DXF) - a primarily 2D format, used here to export 2D planar sections.
