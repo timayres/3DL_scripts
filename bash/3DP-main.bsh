@@ -606,7 +606,7 @@ do_pricing  () {
     # volume_cm3 < 40: 8EUR+0.55EUR/cm3
     # volume_cm3 >= 40: 6EUR+0.6EUR/cm3
     
-    if [ $(bc <<< "($"$volume_cm3" < 40)") -eq 1 ]; then # bc returns 1 if true
+    if (( $(bc <<< "$volume_cm3 < 40") )); then # bc returns 1 if true
         i_materialize=$(bc <<< "scale=2;(8 + 0.55 * $volume_cm3)") # in EUR
     else
         i_materialize=$(bc <<< "scale=2;(6 + 0.60 * $volume_cm3)") # in EUR

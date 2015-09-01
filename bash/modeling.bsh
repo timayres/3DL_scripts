@@ -732,7 +732,7 @@ do_half_bust_FFF() {
     
     #half_bust_FFF_IF="$do_2stl_OF"
     half_bust_FFF_IF="$1"
-    half_bust_FFF_OF="${fpref}_half_bust_neg_vol${meta}.stl"
+    half_bust_FFF_OF="${fpref}_half_bust_FFF_neg_vol${meta}.stl"
     
     ###Measure mesh
     do_measure_geometry "$half_bust_FFF_IF"
