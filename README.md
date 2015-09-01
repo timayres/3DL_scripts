@@ -7,13 +7,13 @@ This project consists of two main parts:
 
 1. For end users, a number of small interactive apps (the 3DP apps) to perform helpful tasks on 3D unstructured triangular meshes, such as scaling, converting, and hollowing. These apps are command line based and are intended to be run by dragging and dropping a 3D mesh model onto the app. These apps make extensive use of part 2.
 
-2. For programmers, an improved interface to generate and run meshlabserver xml filter scripts. No more exporting and hand editing .mlx files, now these can be generated straight from the command line.
+2. For programmers, an improved interface to generate and run meshlabserver xml filter scripts. No more exporting and hand editing .mlx files, now these can be generated straight from the command line! There are also several functions to measure various properties of the mesh (size, volume, center of mass, barycenter), or to take a dimensional measurement with a line cut through the mesh. These measurements can be used to programmatically modify meshes, e.g. by providing these values to OpenSCAD or back into MeshLab. 
 
 This project is written primarily in [Bash](https://en.wikipedia.org/wiki/Bash_%28Unix_shell%29), the Unix shell scripting language, however it also (in fact, primarily) runs on Windows via Cygwin. These scripts use various other programs to do most of the heavy lifting.
 
 
 ##History
-This project was created to automate many of the repetitive tasks involved with processing and preparing 3D scans (primarily of people) with color textures for 3D printing, although it is applicable to other use cases as well.
+This project was created to automate many of the repetitive tasks involved with processing and preparing 3D scans (primarily of humans) with color textures for 3D printing, although the apps are more generally useful as well.
 
 Although there are a growing number of tools to prepare models for 3D printing, many of these do not work with color or textures. In the FLOSS software world [MeshLab](http://meshlab.sourceforge.net/) and [Blender](https://www.blender.org/) are the primary tools of choice for working with such models. Additional tools used include [OpenSCAD](http://www.openscad.org/) and [ADMesh](https://github.com/admesh/admesh), however these only work with STLs and are thus suitable for colorless geometry data only.
 
@@ -93,11 +93,12 @@ You should ensure that models are "clean" (manifold, no holes, etc.) before runn
 
 - _3DP-2objNC_ - this will drop all color info from an obj file. Creates a new file with "NC" (for "no color") added to the end of the filename; the original is not changed. 'Cause sometimes you just want to deal with the geometry! Should work on any (mesh) input file MeshLab supports.
 - _3DP_2objz_ - this will take your obj file, find any associated .mtl material file and texture files and wrap them all together in a zip file. Useful for transferring the complete model (with color data) to another location or uploading to a 3D printing service (e.g. Sculpteo). Currently only works on obj files (it will not convert other formats).
-- _3DP-2stl_ - if a non-stl file is dropped on this app it will make sure it is Z up, convert it to stl, run it through ADMesh for checks & automatic cleaning & save it as an ASCII stl. If an stl is dropped on this it will still run it through ADMesh for checks & automatic cleaning. __Note that this will overwrite the original stl file with the ADMesh output.__ Usually this is perfectly safe and desirable, however if your model has severe issues that ADMesh can't fix this may make it worse. Should work on any (mesh) input file MeshLab supports.
-- _3DP-2x3dz_ - this will convert your model to x3d format, find any associated texture files,   wrap them all together in a zip file, and delete the x3d file. Primarily intended for submitting models to Shapeways. Should work on any (mesh) input file MeshLab supports. _NOTE: I've had issues with the x3d format for some models, so this is planned to be replaced with 2daez in the not too distant future._
+- _3DP-2stl_ will convert input mesh (will re-save stls) to a Z up binary stl and run it through ADMesh for a check (note that ADMesh will not try to fix any problems found since this can fail on some models). Should work on any mesh input file MeshLab supports.
+- _3DP-2x3dz_ - this will convert your model to x3d format, find any associated texture files, wrap them all together in a zip file, and delete the x3d file. Primarily intended for submitting models to Shapeways. Should work on any (mesh) input file MeshLab supports. _NOTE: I've had issues with the x3d format for some models, so this is planned to be replaced with 2daez in the not too distant future._
 - _3DP-check_mesh_ - currently just measures geometry & topology of mesh. _Will be changed in the future._
 - _3DP-hollow_ - a rather complicated script to hollow models for binder jetting 3D printing, e.g. full color stone. A work in progress; expect significant changes in the future. Note that this currently doesn't actually hollow the model; instead it will create the interior "negative volume". You will still need to import the original model into Blender & perform a boolean difference with the negative volume to actually create a hollow model. This app can currently hollow out the bottom of prints, create half-bust magnets, and bobbleheads (just the head). The model must be properly oriented before running the app.
-- _3DP-pricing_ - calculates prices in full color stone for various 3D printing services; currently supports Shapeways & i.Materialize. More services could be added as long as they publish their pricing formula (for example, Sculpteo doesn't).
+- _3DP-platform_FFF_ - takes an input mesh and puts it on a 3mm high round platform. Primarily intended for standing full length figures, but will work on anything. Does not support textures (uses MeshLab's flatten layers filter).
+- _3DP-pricing_ - calculates prices in full color gypsum stone material for various 3D printing services; currently supports Shapeways & i.Materialize. More services could be added if they publish their pricing formula ( Sculpteo, for example, doesn't).
 - _3DP-rename_ - renames the model and any associated secondary files (e.g. materials & textures), which are tedious to rename on their own. You can also keep the current name and use this to just add metadata. App creates new files with the new name, but does not delete the originals. Contains some special rules for handling models produced by itSeez3D.
 - _3DP-scale_ - will scale the model to a different scale ratio. Note that this scales the model based on the new scale ratio, not based on the current model size. For example, if you have a model at 1:10 and you want to make it twice as big, you would enter "-5" (to convert to 1:5 scale), not "2". Creates a new model with different metadata; the original is not changed.
 - _3DP-simplify_ - simplifies the model to a desired number of faces; automatically detects & supports textured models. Will create a new model with "-simp#K" appended to the filename, where "#" is the number of faces in thousands.
@@ -243,5 +244,7 @@ Additional notes on usage:
 - You must supply an input file, even if you don't want one (i.e. you are creating a new mesh). No input file causes a seg fault with v1.3.4BETA. A workaround is to import a simple mesh such as `test_models/PLANE.obj` and run `mlx_del_layer` immediately after `mlx_begin`.
 - `-w proj.mlp` will export all layers as separate mesh files; the layer labels are the filenames. For non-imported meshes the default export format is ply.
 - You can specify multiple output filenames with multiple -o instances, however this will still be the same (current) layer. This is useful for outputting a layer in multiple file formats in the same command.
+
+## Other Useful Functions
 
 
