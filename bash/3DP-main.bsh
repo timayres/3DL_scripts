@@ -22,8 +22,8 @@
 #  0 = very quiet, very few messages printed
 #  1 = normal quiet level, tells you when programs are running & status
 #  2 = display output of checks (measure size, geometry & topology)
-#  3 = display ADMesh log file (do_2stl)
-#  4 = display ADMesh output (do_2stl)
+#  3 = display ADMesh log file
+#  4 = 
 #  5 = display output of "silent" programs, i.e. MeshLab (run_meshlab)
 #  6 = display certain variables for debugging purposes
 
@@ -879,11 +879,11 @@ do_rename () {
 
 do_2stl () {
     # Usage: input_file
-    # returns do_2stl_OF, admesh_log_file
+    # returns do_2stl_OF, admesh_LF
 
-    #  echo "2stl: function to convert file to ASCII stl (no color) using MeshLab
-    # File is run through ADMesh for checks but IS NOT REWRITTEN"
-    # If input is stl it will still be put through admesh to check it, BUT WILL NOT BE REWRITTEN.
+    # 2stl: function to convert file to binary stl (no color) using MeshLab
+    # will also convert ascii stls to binary
+    # File is run through ADMesh for checks afterwards but is not rewritten
     
     local return_code
     
@@ -892,12 +892,12 @@ do_2stl () {
     #fi
     m_color="NC"
     
-    case "${1##*.}" in # check file extension of input
-        [Ss][Tt][Ll] )
-            do_2stl_OF="$1"
-            ;;  
-        * ) # all other file extensions
-            echo ; echo "Converting to stl: "
+    # case "${1##*.}" in # check file extension of input
+        # [Ss][Tt][Ll] )
+            # do_2stl_OF="$1"
+            # ;;  
+        # * ) # all other file extensions
+            echo ; echo "Saving as binary stl: "
             
             # Make sure Z is up
             if [ "$m_up" = "Y" ]; then
@@ -918,15 +918,16 @@ do_2stl () {
             
             run_meshlab
             return_code=$?
-            ;;
-    esac
+            # ;;
+    # esac
     
     run_admesh "$do_2stl_OF" # no output file; check only
    
-    if [ "$app_name" = "3DP-2stl" ] || [ "$verbosity" -ge 3 ]; then
-        echo
-        cat "$admesh_log_file"
-    fi
+    #if [ "$app_name" = "3DP-2stl" ] || [ "$verbosity" -ge 3 ]; then
+    #if [ "$verbosity" -ge 3 ]; then
+        echo 
+        cat "$admesh_LF"
+    #fi
     
     return_file="$do_2stl_OF"
     return $return_code

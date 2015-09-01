@@ -112,6 +112,9 @@ done
 
 # change verbosity of certain apps, e.g. for troubleshooting
 sed -i "s/verbosity=2/verbosity=6/" "3DP-hollow.bsh"
+sed -i "s/verbosity=2/verbosity=3/" "3DP-half_bust_FFF.bsh"
+sed -i "s/verbosity=2/verbosity=3/" "3DP-platform_FFF.bsh"
+sed -i "s/verbosity=2/verbosity=3/" "3DP-2stl.bsh"
 sed -i "s/delete_TEMP3DP_files=\"true\"/delete_TEMP3DP_files=\"false\"/" "3DP-hollow.bsh"
 
 # Generate shortcuts for mlx_scratch.bsh

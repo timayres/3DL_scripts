@@ -10,7 +10,7 @@
 # -e true if file exists
 # -s true if file exists and size is greater than zero
 
-# TODO: identify which filters cause a new layer to be created, and what that new layer name is
+# TODO: identify which filters cause a new layer to be created and what the new layer label is
 
 # TODO: add some error checking of input
 

@@ -268,14 +268,29 @@ do_polylinesort() {
             else
                 #polyline[$i]="${polyline[$i]},[$x,$y]" # for openscad polygon test omit z
                 polyline[$i]="${polyline[$i]},[$x,$y,$z]"
-                polylinelength[$i]=$(bc <<< "scale=10;(sqrt( ($x - $x0)^2+($y - $y0)^2+($z - $z0)^2)+${polylinelength[$i]})") # MUST have space in between subtraction operator to deal with negative numbers
-                if [ $(bc <<< "($x > polyline_xmax[$i])") -eq 1 ]; then polyline_xmax[$i]=$x; fi
-                if [ $(bc <<< "($x < polyline_xmin[$i])") -eq 1 ]; then polyline_xmin[$i]=$x; fi
-                if [ $(bc <<< "($y > polyline_ymax[$i])") -eq 1 ]; then polyline_ymax[$i]=$y; fi
-                if [ $(bc <<< "($y < polyline_ymin[$i])") -eq 1 ]; then polyline_ymin[$i]=$y; fi
-                if [ $(bc <<< "($z > polyline_zmax[$i])") -eq 1 ]; then polyline_zmax[$i]=$z; fi
-                if [ $(bc <<< "($z < polyline_zmin[$i])") -eq 1 ]; then polyline_zmin[$i]=$z; fi
                 
+                #bc is much to slow to operate over hundreds of vertices
+                #polylinelength[$i]=$(bc <<< "scale=10;(sqrt( ($x - $x0)^2+($y - $y0)^2+($z - $z0)^2)+${polylinelength[$i]})") # MUST have space in between subtraction operator to deal with negative numbers
+                #echo x=$x
+                #echo polyline_xmax=${polyline_xmax[$i]}
+                #echo polyline_xmin=${polyline_xmin[$i]}
+                
+                # if (( $(bc <<< "$x > ${polyline_xmax[$i]}") )); then
+                    # polyline_xmax[$i]=$x
+                # elif (( $(bc <<< "$x < ${polyline_xmin[$i]}") )); then
+                    # polyline_xmin[$i]=$x
+                # fi
+                # if (( $(bc <<< "$y > ${polyline_ymax[$i]}") )); then
+                    # polyline_ymax[$i]=$y
+                # elif (( $(bc <<< "$y < ${polyline_ymin[$i]}") )); then
+                    # polyline_ymin[$i]=$y
+                # fi
+                # if (( $(bc <<< "$z > ${polyline_zmax[$i]}") )); then
+                    # polyline_zmax[$i]=$z
+                # elif (( $(bc <<< "$z < ${polyline_zmin[$i]}") )); then
+                    # polyline_zmin[$i]=$z
+                # fi
+
                 # TODO: try out c style double parentheses instead
                 # if (( $(bc <<< "$x > polyline_xmax[$i]") == 1 )); then
                 # if (( $(bc <<< "$x > polyline_xmax[$i]") )); then
@@ -293,9 +308,13 @@ do_polylinesort() {
     #echo ; echo ${!polyline[@]}
     #echo ; echo ${polyline[@]}
     #echo ; echo polyline 2,1 ${polyline[2,1]}
+    #echo "polyline_xmax=" ${polyline_xmax[@]}
+    #echo "polyline_xmin=" ${polyline_xmin[@]}
+    
+    
     
     i=0
-    echo "polygon(points=[${polyline[$j]}]); " > polygons.scad
+    echo "polygon(points=[${polyline[$i]}]); " > polygons.scad
     for ((i=1; i < ${#polyline[@]} ; i++)); do
         echo "polygon(points=[${polyline[$i]}]); " >> polygons.scad
     done

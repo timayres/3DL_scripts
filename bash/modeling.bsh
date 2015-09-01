@@ -800,6 +800,7 @@ do_platform_FFF() {
     
     offset=0.001 # small offset from bottom; this amount will overlap between platform & model
     thickness=3 # thickness of platform
+    fn=100
     
     # Find cross section at offset
     ml_IF="$platform_IF"
@@ -827,11 +828,11 @@ do_platform_FFF() {
     mlx_begin
     if [ "$m_up" = "Y" ]; then
         mlx_translate y=$(bc <<< "scale=10;($thickness - $offset)")
-        mlx_cylinder d=$diameter h=$thickness fn=50
+        mlx_cylinder d=$diameter h=$thickness
         mlx_translate x=$xcenter z=$zcenter
     else
         mlx_translate z=$(bc <<< "scale=10;($thickness - $offset)")
-        mlx_cylinder d=$diameter h=$thickness fn=50
+        mlx_cylinder d=$diameter h=$thickness
         mlx_translate x=$xcenter y=$ycenter
     fi
     mlx_flatten_layers

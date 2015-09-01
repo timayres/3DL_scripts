@@ -113,13 +113,14 @@ if [  ]; then
 fi
 
 # test out various functions before adding them to 3DP-generate_apps.bsh
-if [  ]; then
+if [ 1 ]; then
     #do_measure_dimension   y=2 $1 z=5
     #${scriptpath}/../c/polylinesort.bsh test_outline_closed.obj
     #${scriptpath}/../c/polylinesort.exe polylinesort.test
     #${scriptpath}/../c/polylinesort.exe test_4_outlines_closed.obj
 
     do_polylinesort test_4_outlines_closed.obj
+    #do_polylinesort polylinesort.test
 
     #do_half_bust_FFF "$fbase"
 fi
