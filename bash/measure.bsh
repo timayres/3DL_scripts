@@ -38,11 +38,15 @@ do_measure_size() {
     zmin=$(head -1 "$measure_size_file" | cut -d" " -f3)
     zmax=$(tail -1 "$measure_size_file" | cut -d" " -f3)
     
+    xcenter=$(bc <<< "scale=10;($xmax + $xmin)/2") # x average
+    ycenter=$(bc <<< "scale=10;($ymax + $ymin)/2") # y average
+    zcenter=$(bc <<< "scale=10;($zmax + $zmin)/2") # z average
+    
     xsize=$(bc <<< "($xmax - $xmin)")
     ysize=$(bc <<< "($ymax - $ymin)")
     zsize=$(bc <<< "($zmax - $zmin)")
     BBdiag=$(bc <<< "scale=10;sqrt($xsize^2+$ysize^2+$zsize^2)")
-
+    
     if [ "$verbosity" -ge 2 ]; then
         echo
         echo "Mesh Axis Aligned Bounding Box Size:"
@@ -235,4 +239,66 @@ do_measure_dimension() {
     
     ml_LF=""
     return $return_code
+}
+
+# Usgae: pass outline (output of mlx_section) in obj format, this will sort polylines and load into arrays
+do_polylinesort() {
+    ${scriptpath}/../c/polylinesort.exe $1 # will generate polyline_1.xyz, etc.
+    
+    declare -a polyline
+    declare -a polylinelength
+    i=0
+    #set -x
+    for a in polyline*.xyz; do
+        #echo a=$a
+        j=0
+        while read x y z; do
+            #polyline1[$i]="[$x,$y,$z]" # for openscad
+            echo i=$i j=$j 
+            if [ $j -eq 0 ]; then
+                #polyline[$i]="[$x,$y]" # for openscad polygon test omit z
+                polyline[$i]="[$x,$y,$z]"
+                polylinelength[$i]=0
+                polyline_xmax[$i]=$x
+                polyline_xmin[$i]=$x
+                polyline_ymax[$i]=$y
+                polyline_ymin[$i]=$y
+                polyline_zmax[$i]=$z
+                polyline_zmin[$i]=$z
+            else
+                #polyline[$i]="${polyline[$i]},[$x,$y]" # for openscad polygon test omit z
+                polyline[$i]="${polyline[$i]},[$x,$y,$z]"
+                polylinelength[$i]=$(bc <<< "scale=10;(sqrt( ($x - $x0)^2+($y - $y0)^2+($z - $z0)^2)+${polylinelength[$i]})") # MUST have space in between subtraction operator to deal with negative numbers
+                if [ $(bc <<< "($x > polyline_xmax[$i])") -eq 1 ]; then polyline_xmax[$i]=$x; fi
+                if [ $(bc <<< "($x < polyline_xmin[$i])") -eq 1 ]; then polyline_xmin[$i]=$x; fi
+                if [ $(bc <<< "($y > polyline_ymax[$i])") -eq 1 ]; then polyline_ymax[$i]=$y; fi
+                if [ $(bc <<< "($y < polyline_ymin[$i])") -eq 1 ]; then polyline_ymin[$i]=$y; fi
+                if [ $(bc <<< "($z > polyline_zmax[$i])") -eq 1 ]; then polyline_zmax[$i]=$z; fi
+                if [ $(bc <<< "($z < polyline_zmin[$i])") -eq 1 ]; then polyline_zmin[$i]=$z; fi
+                
+                # TODO: try out c style double parentheses instead
+                # if (( $(bc <<< "$x > polyline_xmax[$i]") == 1 )); then
+                # if (( $(bc <<< "$x > polyline_xmax[$i]") )); then
+                
+            fi
+            #echo polyline[$i] = ${polyline[$i]}
+            #echo polylinelength[$i] = ${polylinelength[$i]}
+            x0=$x
+            y0=$y
+            z0=$z
+            ((j++))
+        done < "$a"
+        ((i++))
+    done
+    #echo ; echo ${!polyline[@]}
+    #echo ; echo ${polyline[@]}
+    #echo ; echo polyline 2,1 ${polyline[2,1]}
+    
+    i=0
+    echo "polygon(points=[${polyline[$j]}]); " > polygons.scad
+    for ((i=1; i < ${#polyline[@]} ; i++)); do
+        echo "polygon(points=[${polyline[$i]}]); " >> polygons.scad
+    done
+    
+    return 0
 }

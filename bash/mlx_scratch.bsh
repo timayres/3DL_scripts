@@ -21,6 +21,7 @@ if [ 1 ]; then
 fi
 
 . ${scriptpath}/3DP-main.bsh
+#. ${scriptpath}/polylinesort.bsh
 
 #cd "${scriptpath}/../test_models/"
 
@@ -34,76 +35,53 @@ if [  ]; then
     ml_OF="test.obj"
     ml_SF="TEMP3DP_mlx_scratch.mlx"
     ml_LF="" # "TEMP3DP_meshlablog.txt"  
-
+    
     mlx_begin
-
+    
+    # Sample filters:
     # mlx_measure_geometry #>=1.3.4 # Compute Geometric Measures
     # mlx_measure_topology #>=1.3.4 # Compute Topological Measures
-    # mlx_del_small_parts # Delete Small Components # stl needs vertices merged
+    # mlx_del_small_parts
     # mlx_rotate x=90 # Usage: rotAxis angle
     # mlx_translate x=0 y=0 z=0 # Usage: transX transY transZ
     # mlx_scale scale=1 # Usage: scale | scaleX scaleY scaleZ
     # mlx_section y=0 surface=true #>=1.3.4 # Usage: planeAxis planeOffset (line | surface)
-    # mlx_simplify faces=10000 # Usage: TargetFaceNum # stl needs vertices merged
-    # mlx_offset voxel=3 delta=3 #
+    # mlx_simplify faces=10000 # Usage: TargetFaceNum
     # mlx_offset voxel=2 delta=3 # Usage: cellsize offset
-    # mlx_subdivide 1 # Usage: Iterations
-    # mlx_smooth 1 # Usage: Iterations
-    # mlx_measure_topology
+    # mlx_subdivide
+    # mlx_smooth
     
     if [  ]; then
-        #mlx_section z=0 surface=false
-        #mlx_section custom=0 customaxis=,5, surface=true planeref=1
-        mlx_rotate x=65 y=30 customaxis=1,2 custom=20 customCenter=7,,9 center=custom customaxis=4,,6 custom=25 customaxis=,, custom=35
-    fi
-    
-    if [  ]; then
-        #mlx_offset voxel=1 delta=0.1
-        mlx_cube
-        mlx_scale scale=8192
+        mlx_offset voxel=1 delta=0.1
     fi
 
     if [  ]; then
         mlx_del_small_parts
         mlx_measure_topology
     fi
-
-    if [  ]; then
-        mlx_measure_geometry
-        mlx_measure_topology
-    fi
-    
-    if [  ]; then
-        mlx_del_layer
-        #mlx_cube s=10
-        #mlx_square 10 10 true
-        #mlx_cylinder h=5 r1=1 r2=2 fn=100
-
-    fi
     
     mlx_end
 
     #set -x
     run_meshlab
-    #meshlabserver -o "$ml_OF" -s "$ml_SF"
     return_code=$?
 fi
 
-# TODO: test out mlp files; can you output multiple files?
-
-# Create Captain America's shield!
-if [ 1 ]; then
-    fn=50
+# Create Captain America's shield in MeshLab 2D vertex colored surfaces!
+if [  ]; then
+    fn=50 # set number or segments to use for circles
     ml_IF="$fbase"
     ml_SF="TEMP3DP_shield.mlx"
     ml_OF="shield.obj"
     mlx_begin
     mlx_del_layer
     
-    # Create star by scaling 5 squares into diamonds & rotating around
+    # Create star by scaling 5 squares into diamonds & rotating them around
+    
+    # Star calculations (consider a central pentagon with 5 triangles attached to the edges)
     r=2 # radius of circumscribing circle
-    p=$(bc -l ${scriptpath}/funcs.bc <<< "scale=10;($r/(1 + tan(36*pi()/180)/tan(18*pi()/180)))") # distance from center to pentagon edge
-    w=$(bc -l ${scriptpath}/funcs.bc <<< "scale=10;($p*tan(36*pi()/180))") # 1/2 width pentagon edge/outer triangle bottom
+    p=$(bc -l ${scriptpath}/funcs.bc <<< "scale=10;($r/(1 + tan(36*pi()/180)/tan(18*pi()/180)))") # distance from center to pentagon edge midpoint
+    w=$(bc -l ${scriptpath}/funcs.bc <<< "scale=10;($p*tan(36*pi()/180))") # 1/2 width of pentagon edge/outer triangle bottom
     h=$(bc -l ${scriptpath}/funcs.bc <<< "scale=10;($w/tan(18*pi()/180))") # height of outer triangle
 
     for ((i=1; i <= 5 ; i++)); do
@@ -136,171 +114,14 @@ fi
 
 # test out various functions before adding them to 3DP-generate_apps.bsh
 if [  ]; then
+    #do_measure_dimension   y=2 $1 z=5
+    #${scriptpath}/../c/polylinesort.bsh test_outline_closed.obj
+    #${scriptpath}/../c/polylinesort.exe polylinesort.test
+    #${scriptpath}/../c/polylinesort.exe test_4_outlines_closed.obj
 
-do_half_bust_FFF "$fbase"
+    do_polylinesort test_4_outlines_closed.obj
 
+    #do_half_bust_FFF "$fbase"
 fi
-
-# load file
-if [  ]; then
-    i=0
-    j=0
-    while read type x y z; do
-        if [ "$type" = "v" ]; then
-            vertices[$i]=$x,$y,$z #"\[$x,$y,$z\]"
-            ((i++))
-            #echo $i
-        fi
-        if [ "$type" = "l" ]; then
-            line_segments[$j]=$x,$y #"\[$x,$y,$z\]"
-            ((j++))
-            #echo $i
-        fi        
-    done < test_section.obj
-    
-    # extract head and tail vertex numbers
-    #echo $(echo ${line_segments[0]} | cut -d"," -f1)
-    head=${line_segments[0]%,*}
-    tail=${line_segments[0]#*,}
-    echo head="$head"
-    echo tail="$tail"
-    
-    # read invividual vertex into array
-    OIFS="$IFS"; IFS=,; read -a vertex1 <<< ${vertices[0]}; IFS="$OIFS"
-    echo "vertex 1 ="${vertex1[@]}
-    
-    #line_num=0
-    #i=0
-    #line_1[0]=${line_segments[0]%,*}
-    #line_1[1]=${line_segments[0]#*,}
-    #for a in ${line_segments[@]}; do
-    
-    #reverse array and try again!
-    
-    #printf "%s\n" "${vertices[@]}" > vertices.txt
-    #printf "%s\n" "${line_segments[@]}" > line_segments.txt    
-    
-    # OIFS="$IFS"; IFS=$'\n'; array=($(<file)); IFS="$OIFS"
-    # Copy $IFS, set $IFS to newline, slurp file into array and reset $IFS back again.
-    # OIFS="$IFS"; IFS=,; echo "${my_path[*]}"; IFS="$OIFS"
-    # OIFS="$IFS"; IFS=,; my_path_scad="[${my_path[*]}]"; IFS="$OIFS"
-    # echo "$my_path_scad"
-
-fi
-
-# load sorted xyz
-if [  ]; then
-    j=1
-    for a in polyline*.xyz; do
-        # There's got to be a better way to do this without multidimensional arrays
-        case $j in
-            1)
-                i=0
-                polylinelength1=0
-                while read x y z; do
-                    polyline1[$i]="[$x,$y,$z]" # for openscad
-                    # TODO: measure length of polyline while we read it
-                    if [ $i -gt 0 ]; then
-                        polylinelength1=$(bc <<< "scale=10;(sqrt( ($x-$x0)^2+($y-$y0)^2+($z-$z0)^2)+$polylinelength1)")
-                    fi
-                    x0=$x
-                    y0=$y
-                    z0=$z
-                    ((i++))
-                done < "$a"
-                ((j++))
-                ;;
-            2)
-                i=0
-                polylinelength1=0
-                while read x y z; do
-                    polyline1[$i]="[$x,$z]" # for openscad
-                    #if [ $i -gt 0 ]; then
-                        #polylinelength1==$(bc <<< "($sizeX/2)")
-                    #fi
-                    # TODO: measure length of polyline while we read it
-                    ((i++))
-                done < "$a"
-                ((j++))
-                ;;
-            3)
-                i=0
-                polylinelength1=0
-                while read x y z; do
-                    polyline1[$i]="[$x,$z]" # for openscad
-                    #if [ $i -gt 0 ]; then
-                        #polylinelength1==$(bc <<< "($sizeX/2)")
-                    #fi
-                    # TODO: measure length of polyline while we read it
-                    ((i++))
-                done < "$a"
-                ((j++))
-                ;;
-            4)
-                i=0
-                polylinelength1=0
-                while read x y z; do
-                    polyline1[$i]="[$x,$z]" # for openscad
-                    #if [ $i -gt 0 ]; then
-                        #polylinelength1==$(bc <<< "($sizeX/2)")
-                    #fi
-                    # TODO: measure length of polyline while we read it
-                    ((i++))
-                done < "$a"
-                ((j++))
-                ;;
-            5)
-                i=0
-                polylinelength1=0
-                while read x y z; do
-                    polyline1[$i]="[$x,$z]" # for openscad
-                    #if [ $i -gt 0 ]; then
-                        #polylinelength1==$(bc <<< "($sizeX/2)")
-                    #fi
-                    # TODO: measure length of polyline while we read it
-                    ((i++))
-                done < "$a"
-                ((j++))
-                ;;
-            *)
-                # too many
-                ;;
-        esac
-        #declare -A "polyline$j"
-        # ${a%.*} # strip extension
-        #arrayname="polyline"
-
-        #eval array=\( \${${arrayname}[@]} \)
-    done
-    
-    OIFS="$IFS"; IFS=,; path_scad="[${polyline[*]}]"; IFS="$OIFS"
-    echo "$path_scad" > path_scad.txt
-    
-    # TODO:
-    
-    #line_num=0
-    #i=0
-    #line_1[0]=${line_segments[0]%,*}
-    #line_1[1]=${line_segments[0]#*,}
-    #for a in ${line_segments[@]}; do
-    
-    #reverse array and try again!
-    
-    #printf "%s\n" "${vertices[@]}" > vertices.txt
-    #printf "%s\n" "${line_segments[@]}" > line_segments.txt    
-    
-    # OIFS="$IFS"; IFS=$'\n'; array=($(<file)); IFS="$OIFS"
-    # Copy $IFS, set $IFS to newline, slurp file into array and reset $IFS back again.
-    # OIFS="$IFS"; IFS=,; echo "${my_path[*]}"; IFS="$OIFS"
-    # OIFS="$IFS"; IFS=,; my_path_scad="[${my_path[*]}]"; IFS="$OIFS"
-    # echo "$my_path_scad"
-
-fi
-
-if [  ]; then
-    do_measure_dimension   y=2 $1 z=5
-fi
-
-##do_measure_dimension "$fbase" x=-.1938705000 y=24.4973510000
 
 pause

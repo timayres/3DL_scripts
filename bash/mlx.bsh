@@ -124,6 +124,48 @@ run_openscad() {
     return $return_code
 }
 
+run_admesh() {
+    #$1=input
+    #$2=output - if blank run check only, otherwise output ascii stl
+    
+    local start_time
+    local end_time
+    local diff_time
+    local return_code
+    local O=""
+    
+    # set default log file if it is not already set
+    if [ -z "$admesh_LF" ]; then
+        admesh_LF="TEMP3DP_admeshlog.txt"
+    fi
+    
+    # check for output file
+    if [ -n "$2" ]; then
+        O="-a $2"
+    fi
+    
+	echo
+	if [  "$verbosity" -ge 4  ]; then
+		echo "*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*"
+	fi
+    echo -n "    Running ADMesh ... "
+    start_time=$(date +%s.%N)
+    admesh "$1" $O > "$admesh_LF"
+    return_code=$?
+    end_time=$(date +%s.%N)
+    diff_time=$(bc <<< "$end_time - $start_time")
+    diff_time=$(printf %.0f $diff_time) #round to integer milliseconds
+    echo -n "finished in "; printf "%0dh:%0dm:%0ds" $(($diff_time/3600)) $(($diff_time%3600/60)) $(($diff_time%60)); echo ", return code: $return_code"
+    if [ "$verbosity" -ge 4 ]; then
+		echo "*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*"
+	fi
+    if [ $return_code -ne 0 ]; then
+        pause "Uh oh, looks like there's an error. Hit any key to keep going anyway ... "
+    fi
+    
+    return $return_code
+}
+
 # Modify this function to add additional input file support
 # Function to find associated subfiles, e.g. material & texture files.
 do_subfiles () {
@@ -1276,6 +1318,7 @@ mlx_simplify() {
     local i
     
     if [ -z "$m_color" ]; then do_subfiles "$ml_IF"; fi # set m_color based on input file
+    
     # TODO: add warnings if options are specified that do not apply
     
     for i in "$@"; do
@@ -2205,22 +2248,65 @@ mlx_hausdorff_distance() {
 
 mlx_sampling_pd() { # Poisson-disk Sampling
     # Options & Defaults
-    local SampleNum # The desired number of samples. The ray of the disk is calculated according to the sampling density.
-    local Radius # If not zero this parameter override the previous parameter to allow exact radius specification, max=BBdiag
-    local MontecarloRate # The over-sampling rate that is used to generate the intial Montecarlo samples (e.g. if this parameter is &lt;i>K&lt;/i> means that&lt;i>K&lt;/i> x &lt;i>poisson sample&lt;/i> points will be used). The generated Poisson-disk samples are a subset of these initial Montecarlo samples. Larger this number slows the process but make it a bit more accurate.
-    local SaveMontecarlo # If true, it will generate an additional Layer with the montecarlo sampling that was pruned to build the poisson distribution.
+    local sample_num # The desired number of samples. The ray of the disk is calculated according to the sampling density.
+    local radius # If not zero this parameter override the previous parameter to allow exact radius specification, max=BBdiag
+    local montecarloRate # The over-sampling rate that is used to generate the intial Montecarlo samples (e.g. if this parameter is &lt;i>K&lt;/i> means that&lt;i>K&lt;/i> x &lt;i>poisson sample&lt;/i> points will be used). The generated Poisson-disk samples are a subset of these initial Montecarlo samples. Larger this number slows the process but make it a bit more accurate.
+    local saveMontecarlo # If true, it will generate an additional Layer with the montecarlo sampling that was pruned to build the poisson distribution.
     local ApproximateGeodesicDistance # If true Poisson Disc distances are computed using an approximate geodesic distance, e.g. an euclidean distance weighted by a function of the difference between the normals of the two points.
-    local Subsample # If true the original vertices of the base mesh are used as base set of points. In this case the SampleNum should be obviously much smaller than the original vertex number.&lt;br>Note that this option is very useful in the case you want to subsample a dense point cloud.
-    local RefineFlag # If true the vertices of the below mesh are used as starting vertices, and they will utterly refined by adding more and more points until possible.
-    local RefineMesh # Used only if the above option is checked.
-    local BestSampleFlag # If true it will use a simple heuristic for choosing the samples. At a small cost (it can slow a bit the process) it usually improve the maximality of the generated sampling.
-    local BestSamplePool # Used only if the Best Sample Flag is true. It control the number of attempt that it makes to get the best sample. It is reasonable that it is smaller than the Montecarlo oversampling factor.
-    local ExactNumFlag # If requested it will try to do a dicotomic search for the best poisson disk radius that will generate the requested number of samples with a tolerance of the 0.5%. Obviously it takes much longer.
-    local RadiusVariance # The radius of the disk is allowed to vary between r and r*var. If this parameter is 1 the sampling is the same of the Poisson Disk Sampling.
+    local subsample # If true the original vertices of the base mesh are used as base set of points. In this case the SampleNum should be obviously much smaller than the original vertex number.&lt;br>Note that this option is very useful in the case you want to subsample a dense point cloud.
+    local refine # If true the vertices of the below mesh are used as starting vertices, and they will utterly refined by adding more and more points until possible.
+    local refineMesh # Used only if the above option is checked.
+    local bestSample # If true it will use a simple heuristic for choosing the samples. At a small cost (it can slow a bit the process) it usually improve the maximality of the generated sampling.
+    local bestSamplePool # Used only if the Best Sample Flag is true. It control the number of attempt that it makes to get the best sample. It is reasonable that it is smaller than the Montecarlo oversampling factor.
+    local exactNum # If requested it will try to do a dicotomic search for the best poisson disk radius that will generate the requested number of samples with a tolerance of the 0.5%. Obviously it takes much longer.
+    local radiusVariance # The radius of the disk is allowed to vary between r and r*var. If this parameter is 1 the sampling is the same of the Poisson Disk Sampling.
     
     # Other
     local i
     
+    for i in "$@"; do
+        case $i in
+            sampled[lL]ayer=*)
+                sampledLayer="${i#*=}"
+                shift # past argument=value
+                ;;
+            target[lL]ayer=*)
+                targetLayer="${i#*=}"
+                shift # past argument=value
+                ;;
+            save[sS]ample=*|save=*)
+                saveSample="${i#*=}"
+                shift # past argument=value
+                ;;
+            sample_V=*)
+                sample_V="${i#*=}"
+                shift # past argument=value
+                ;;
+            sample_E=*)
+                sample_E="${i#*=}"
+                shift # past argument=value
+                ;;
+            sample_fauxE=*)
+                sample_fauxE="${i#*=}"
+                shift # past argument=value
+                ;;
+            sample_F=*)
+                sample_F="${i#*=}"
+                shift # past argument=value
+                ;;
+            sample_num=*)
+                sample_num="${i#*=}"
+                shift # past argument=value
+                ;;
+            maxdist=*)
+                maxdist="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
+    done
     
     echo "\
     <filter name=\"Poisson-disk Sampling\">

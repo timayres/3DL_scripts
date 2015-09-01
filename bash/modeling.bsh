@@ -584,9 +584,6 @@ linear_extrude (height = 10) offset (delta = -0.9*bottom_section_width/2) projec
             return_code=$?
             do_measure_size "$do_h4_find_center_OF"
             
-            xcenter=$(bc <<< "scale=10;($xmax + $xmin)/2") # x average
-            ycenter=$(bc <<< "scale=10;($ymax + $ymin)/2") # y average
-            
             # Find height of offset volume at center location
             do_measure_dimension "$do_h3_offset_OF" x=$xcenter y=$ycenter
             center_height="$axismax"
@@ -729,7 +726,10 @@ do_half_bust_FFF() {
     local return_code
     
     # make an stl version for OpenSCAD processing
-    #do_2stl "$1" #this will also run do_metadata & set m_color=NC
+    do_2stl "$1" #this will also run do_metadata, set m_color=NC & perform an admesh check
+    #do_metadata "$1"
+    #m_color="NC"
+    
     #half_bust_FFF_IF="$do_2stl_OF"
     half_bust_FFF_IF="$1"
     half_bust_FFF_OF="${fpref}_half_bust_neg_vol${meta}.stl"
@@ -785,3 +785,61 @@ zmax=$zmax;
     return_file="$half_bust_FFF_OF"
     return $return_code
 }
+
+# function to put standing figure on a platform
+# Textures are not currently supported since we're using mlx_flatten_layers
+do_platform_FFF() {
+    local return_code
+    
+    do_2stl "$1" #this will also run do_metadata, set m_color=NC & perform an admesh check
+    #do_metadata "$1"
+    #m_color="NC"
+    
+    platform_IF="$1"
+    platform_OF="${fpref}_platform${meta}.stl"
+    
+    offset=0.001 # small offset from bottom; this amount will overlap between platform & model
+    thickness=3 # thickness of platform
+    
+    # Find cross section at offset
+    ml_IF="$platform_IF"
+    ml_OF="TEMP3DP_${fpref}_section${meta}.xyz"   
+    ml_SF="TEMP3DP_section.mlx"
+    
+    mlx_begin
+    if [ "$m_up" = "Y" ]; then
+        mlx_section y=$offset  surface=false
+    else
+        mlx_section z=$offset  surface=true
+    fi
+    mlx_end
+    run_meshlab
+    return_code=$?
+    
+    do_measure_size "$ml_OF"
+    
+    diameter=$(bc <<< "scale=10;(1.10 * $BBdiag)") # diameter of platform, 10% more than BB diagonal
+    
+    ml_IF="$platform_IF"
+    ml_OF="$platform_OF"
+    ml_SF="TEMP3DP_platform.mlx"
+    
+    mlx_begin
+    if [ "$m_up" = "Y" ]; then
+        mlx_translate y=$(bc <<< "scale=10;($thickness - $offset)")
+        mlx_cylinder d=$diameter h=$thickness fn=50
+        mlx_translate x=$xcenter z=$zcenter
+    else
+        mlx_translate z=$(bc <<< "scale=10;($thickness - $offset)")
+        mlx_cylinder d=$diameter h=$thickness fn=50
+        mlx_translate x=$xcenter y=$ycenter
+    fi
+    mlx_flatten_layers
+    mlx_end
+    run_meshlab
+    return_code=$?
+    
+    return_file="$platform_OF"
+    return $return_code
+}
+

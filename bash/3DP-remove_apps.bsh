@@ -20,6 +20,7 @@ hollow
 center
 center_x
 half_bust_FFF
+platform_FFF
 "
 
 scriptpath="$(cd "$(dirname "$0")"; pwd -P)"

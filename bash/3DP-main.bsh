@@ -3,9 +3,7 @@
 #license: LGPLv2.1
 #version="alpha"
 
-# TODO: update test_model, update scad files to reference it. Use 1:8 model so it works with half-bust.
-
-# TODO: change do_stl to NOT overwrite with admesh.
+# TODO: update test_model, update scad files to reference it. Use at least 1:8 model so it works with half-bust.
 
 # TODO: remove do_ prefix?
 
@@ -90,6 +88,13 @@ else
     unixpath="$1"
 fi
 
+##Include sub scripts
+. ${scriptpath}/mlx.bsh
+. ${scriptpath}/measure.bsh
+. ${scriptpath}/modeling.bsh
+
+#########Functions##########
+
 parse_metadata () {
     fpref_full="${1%.*}" # full file prefix, including metadata
     
@@ -113,47 +118,9 @@ parse_metadata () {
     fi
 }
 
-### Begin Find file paths
-scriptpath="$(cd "$(dirname "$0")"; pwd -P)" # path of this script file
-#use ${scriptpath%/*} to get parent directory
-fpath="${unixpath%/*}" # input file path
-cd "$fpath" # make the directory containing the input file the current directory
-fbase="${unixpath##*/}" # file basename (prefix+extension)
-parse_metadata "$fbase" # set initial fpref_full, fpref, m_scale, m_up
-
-if [ "$verbosity" -ge 6 ]; then
-    echo ; echo scriptpath = "$scriptpath"; echo unixpath="$unixpath"; echo fpath="$fpath"; echo fbase="$fbase"; echo fpref_full="$fpref_full"; echo ML_VERSION="$ML_VERSION"
-fi
-### End Find file paths
-
-###Remove temp files
-if [ "$delete_TEMP3DP_files" = "true" ]; then
-	rm -f TEMP3DP_* # Delete all files with temp file prefix
-fi
-
-#########Functions##########
-
-##Include sub scripts
-. ${scriptpath}/mlx.bsh
-. ${scriptpath}/measure.bsh
-. ${scriptpath}/modeling.bsh
-
-delete_originals() { # not currently used
-    # function to delete a file and its secondary, e.g. mtl file
-    # textures are NOT deleted, since they can be used by multiple files
-
-    case "${1##*.}" in # check file extension
-        [Oo][Bb][Jj] )
-            if [ "$m_color" = UV ]; then
-                do_subfiles "$1"
-                if [ -e "$material_file" ]; then
-                    rm -f "$material_file" # delete original material file
-                fi
-            fi
-            ;;
-    esac
-    rm -f "$1"
-    return 0
+set_meta() {
+    # meta=".${m_scale}.${m_up}.${m_color}.${m_solid}"
+    meta="(${m_scale}${m_up})"
 }
 
 do_metadata () {
@@ -168,7 +135,7 @@ do_metadata () {
         echo fpref="$fpref"
         echo m_scale="$m_scale"
         echo m_up="$m_up"
-        echo m_color="$m_color"
+        #echo m_color="$m_color"
         #echo m_solid="$m_solid"
     fi
 
@@ -237,8 +204,7 @@ do_metadata () {
     fi
     ###/Check m_scale
   
-    ### Check m_up
-    ## Y or Z
+    ### Check m_up, valid values are Y or Z
     case "${1##*.}" in # check file extension of input
         [Ss][Tt][Ll] )
             m_up_default="Z"
@@ -271,31 +237,7 @@ do_metadata () {
     done
     ### End check m_up
 
-    do_subfiles "$1"
-  
-    ### Check m_solid
-    ## S or H
-    m_solid_test="true"
-    while [ "$m_solid_test" = "false" ]; do
-        case "$m_solid" in
-            S )
-                m_solid_test="true"
-                ;;
-            H )
-                m_solid_test="true"
-                ;;
-            * )
-                echo
-                echo "Is the mesh solid (S) or hollow (H)?"
-                echo -n "Hit enter to accept the default (\"S\"): "
-                read m_solid
-                if [ -z "$m_solid" ]; then
-                    m_solid="S"
-                fi
-                ;;
-        esac
-    done
-    ### End check m_solid
+    #do_subfiles "$1" # don't want this here, e.g. for do_2stl.
     
     set_meta
   
@@ -303,23 +245,36 @@ do_metadata () {
         echo
         echo "Metadata values at end of do_metadata:"
         echo m_scale = "$m_scale"
+        echo scale = "$scale"
         echo m_up = "$m_up"
-        echo m_color = "$m_color"
+        #echo m_color = "$m_color"
         #echo m_solid = "$m_solid"
         echo meta = "$meta"
     fi
     return 0
 }
 
-set_meta() {
-    # meta=".${m_scale}.${m_up}.${m_color}.${m_solid}"
-    meta="(${m_scale}${m_up})"
+delete_originals() { # not currently used
+    # function to delete a file and its secondary, e.g. mtl file
+    # textures are NOT deleted, since they can be used by multiple files
+
+    case "${1##*.}" in # check file extension
+        [Oo][Bb][Jj] )
+            if [ "$m_color" = UV ]; then
+                do_subfiles "$1"
+                if [ -e "$material_file" ]; then
+                    rm -f "$material_file" # delete original material file
+                fi
+            fi
+            ;;
+    esac
+    rm -f "$1"
+    return 0
 }
 
 do_fix_mesh() {
     ##Function to automatically fix mesh, particularly after resampling
     
-    local line_no
     local return_code
     
     cp "$1" "${1%(*}-original${meta}.stl"
@@ -419,7 +374,7 @@ do_fix_mesh() {
             fi
         fi
         
-        do_2stl "$ml_OF" "$ml_OF"
+        run_admesh "$ml_OF" "$ml_OF"
         echo ; echo "Checking mesh topology after ADMesh ... "
         ml_IF="$ml_OF"
         ml_OF="$ml_OF"
@@ -455,7 +410,7 @@ do_fix_mesh() {
             parse_topology_log "$ml_LF"
         fi
         
-        do_2stl "$ml_OF" "$ml_OF"
+        run_admesh "$ml_OF" "$ml_OF"
         echo ; echo "Checking mesh topology after ADMesh ... "
         ml_IF="$ml_OF"
         ml_OF="$ml_OF"
@@ -510,6 +465,43 @@ do_check_mesh() {
     return $return_code
 }
 
+do_repair() {
+    ##Function to check mesh by running "Compute Topological Measures" in ML
+    ##TODO: add additional options to try to fix any issues found
+    
+    local line_no
+    local return_code
+    
+    do_measure_all "$1"
+    
+    
+    
+    #Note on manifoldness: many 3D printing programs consider a mesh to be "manifold" if each edge shares exactly 2 faces, which implies watertightness. MeshLab on the other hand defines a mesh as manifold if each edge shares 2 or fewer faces; this means that a mesh can be "manifold" according to MeshLab and yet still have boundary edges (holes). For 3D printing purposes a mesh needs to both be manifold AND have zero boundary edges/holes (watertight).
+    
+    # Original file: 
+    # Repaired file: file-repaired
+    
+    # delete small parts (if num_parts > 1)
+    # merge close vertcies (enter threshold)
+    # fix non-manifold edges (run multiple times?)
+    # fix non-manifold vertices (run multiple times?)
+    # del non-manifold edges (will create holes)
+    # del non-manifold vertices (will create holes)
+    # del useless geometry (unreferenced V, zero area faces, mlx_del_duplicate_F, mlx_del_duplicate_E)
+    # grow holes (number of iterations)
+    # close holes (MeshLab) (must be manifold)
+    # ADMesh check (does not write changes - stl only)
+    # ADMesh fix (closes holes & additional cleaning - stl only)
+    # fix normals (must be manifold)
+    # check geometry
+    # Start over (revert to original file)
+    
+    
+    ml_LF=""
+    return_file="$1"
+    return $return_code
+}
+
 # Need to add capability to accept multiple input files
 # function to use openscad to perform a boolean union on multiple input files
 do_union() {
@@ -546,6 +538,7 @@ do_simplify() {
     
     #if [ -z "$m_color" ]; then  
     do_metadata "$1" # set m_scale
+    do_subfiles "$1"
     #fi
     
     do_measure_all "$1"
@@ -635,6 +628,7 @@ do_scale () {
     
     #if [ -z "$m_scale" ]; then  
     do_metadata "$1" # set m_scale
+    do_subfiles "$1" # needed for output options
     #fi
     
     scale_cur="$scale" # current scale
@@ -750,6 +744,7 @@ do_swapYZ () {
   
     #if [ -z "$m_up" ]; then
     do_metadata "$1" # set m_up
+    do_subfiles "$1" # needed for output options
     #fi
 
     if [ "$m_up" = "Y" ]; then # YtoZ: rotate x=90
@@ -818,7 +813,8 @@ do_rename () {
         do_subfiles "$1"
     else
         rename_fpref="true"
-        do_metadata "$1" # this will also run do_subfiles
+        do_metadata "$1"
+        do_subfiles "$1"
     fi
 
     do_rename_OF="${fpref}${meta}.${1##*.}"
@@ -882,23 +878,23 @@ do_rename () {
 }
 
 do_2stl () {
-    # Usage: input_file output_file
+    # Usage: input_file
     # returns do_2stl_OF, admesh_log_file
-    # if output_file is blank then the output file name will be automatically set based on the input file name & metadata
 
-    #  echo "2stl: function to convert file to ASCII stl, no color, using MeshLab and then ADMesh."
-    # If input is stl it will be put through admesh to clean it.
+    #  echo "2stl: function to convert file to ASCII stl (no color) using MeshLab
+    # File is run through ADMesh for checks but IS NOT REWRITTEN"
+    # If input is stl it will still be put through admesh to check it, BUT WILL NOT BE REWRITTEN.
     
     local return_code
     
-    if [ -z "$2" ]; then
-        do_metadata "$1"
-    fi
+    #if [ -z "$2" ]; then
+    do_metadata "$1"
+    #fi
     m_color="NC"
     
     case "${1##*.}" in # check file extension of input
         [Ss][Tt][Ll] )
-            admesh_IF="$1"
+            do_2stl_OF="$1"
             ;;  
         * ) # all other file extensions
             echo ; echo "Converting to stl: "
@@ -906,6 +902,8 @@ do_2stl () {
             # Make sure Z is up
             if [ "$m_up" = "Y" ]; then
                 m_up="Z"
+                set_meta
+                
                 ml_SF="TEMP3DP_rotate.mlx"
                 mlx_begin
                 mlx_rotate x=90
@@ -914,46 +912,20 @@ do_2stl () {
                 ml_SF=""
             fi
             
+            do_2stl_OF="${fpref}${meta}.stl"
             ml_IF="$1"
-            ml_OF="TEMP3DP_ml_output.stl"            
+            ml_OF="$do_2stl_OF"
             
             run_meshlab
             return_code=$?
-            admesh_IF="$ml_OF"
             ;;
     esac
-    set_meta
     
-    if [ -z "$2" ]; then
-        do_2stl_OF="${fpref}${meta}.stl"
-    else
-        do_2stl_OF="$2"
-    fi
-  
-    admesh_log_file="TEMP3DP_admeshlog.txt"
-	echo
-	if [  "$verbosity" -ge 4  ]; then
-		echo "*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*"
-	fi
-    echo -n "    Running ADMesh ... " # clean & output ASCII stl
-    admesh "$admesh_IF" -a "$do_2stl_OF" > "$admesh_log_file"
-    return_code=$?
-    echo "finished, return code: $return_code"
-    
-    if [ "$app_name" = "3DP-2stl" ] || [ "$verbosity" -ge 4  ]; then
+    run_admesh "$do_2stl_OF" # no output file; check only
+   
+    if [ "$app_name" = "3DP-2stl" ] || [ "$verbosity" -ge 3 ]; then
         echo
         cat "$admesh_log_file"
-    fi
-    	if [ "$verbosity" -ge 4 ]; then
-		echo "*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*ADMesh*"
-	fi
-    
-    if [ $return_code -ne 0 ]; then
-        pause "Uh oh, looks like there's an error. Hit any key to keep going anyway ... "
-    fi
-  
-    if [ "$admesh_IF" != "$1" ]; then  
-        rm -f "$admesh_IF"
     fi
     
     return_file="$do_2stl_OF"
@@ -972,11 +944,9 @@ do_2objNC () {
     if [ -z "$2" ]; then
         do_metadata "$1"
         m_color="NC"
-        set_meta
         do_2objNC_OF="${fpref}-NC${meta}.obj"
     else
         m_color="NC"
-        set_meta
         do_2objNC_OF="${2%.*}.obj"
     fi
     
@@ -1190,7 +1160,7 @@ do_center_x () {
     sect_ysize="$ysize"
     sect_zsize="$zsize"
     
-    transx=$(bc <<< "($sect_xsize * 0.5) - $sect_xmax")
+    transx=$(bc <<< "($sect_xsize * 0.5) - $sect_xmax")  # -$xcenter
     #transy=$(bc <<< "($sect_ysize * 0.5) - $sect_ymax")
     #transz=$(bc <<< "($sect_zsize * 0.5) - $sect_zmax")
     
@@ -1236,4 +1206,26 @@ do_center_x () {
 #do_replace_texture
 #this should work by dragging an obj and the new texture on the file
 #should rename file by default; option to operate in place?
+
+### Begin Find file paths
+scriptpath="$(cd "$(dirname "$0")"; pwd -P)" # path of this script file
+#use ${scriptpath%/*} to get parent directory
+fpath="${unixpath%/*}" # input file path
+cd "$fpath" # make the directory containing the input file the current directory
+fbase="${unixpath##*/}" # file basename (prefix+extension)
+
+#do_metadata "$fbase" # don't want to set this here because of do_rename
+parse_metadata "$fbase" # set initial fpref_full, fpref, m_scale, m_up
+set_meta # set initial meta value
+
+if [ "$verbosity" -ge 6 ]; then
+    echo ; echo scriptpath = "$scriptpath"; echo unixpath="$unixpath"; echo fpath="$fpath"; echo fbase="$fbase"; echo fpref_full="$fpref_full"; echo ML_VERSION="$ML_VERSION"
+fi
+### End Find file paths
+
+###Remove temp files
+if [ "$delete_TEMP3DP_files" = "true" ]; then
+	rm -f TEMP3DP_* # Delete all files with temp file prefix
+fi
+
 

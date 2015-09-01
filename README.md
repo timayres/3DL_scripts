@@ -111,7 +111,7 @@ The mlx.bsh script contains functions to programmatically run MeshLab filters vi
 One particular use case is to take measurements of a mesh to input into OpenSCAD; it is used in just this way in the script modeling.bsh (contains the hollowing functions).
 
 ## Usage
-Here is a general overview of how to use the functions to write your own scripts.
+Here is a general overview of how to use the functions to write your own scripts. You can also examine the 3DP app functions for practical examples.
 
 First define the variable `ml_SF` with the filename of the script file you want to create, for example `temp.mlx`. WARNING: if this filename already exists it will be overwritten.
 
@@ -153,7 +153,7 @@ Some filters have additional features added or a different interface defined. Fo
 All filter options are specified when calling the filter using the pattern `option=value`. Read the code to see specifics. All options that are available can be specified unless they serve no purpose in a script (such as the rotation snap angle). All options have default values so it is not required to specify any options at all (although for some filters such as the transformations a call with no options won't actually do anything). Please note that the default values are those we've found to be the most useful and may differ from MeshLab's defaults. Check first!
 
 ###Run the script in meshlabserver
-You have two options to run mlx scripts, the `run_meshlab` function or just calling meshlabserver directly.
+You have two primary options to run mlx scripts, the `run_meshlab` function or just calling meshlabserver directly. A third option is to load and run the scripts in the GUI, which can be especially useful for debugging.
 
 ####run_meshlab
 `run_meshlab` adds a few features and conveniences, such as the ability to silence meshlab's output, track its run time, and automatically determine file output options. The  downside is that not all meshlabserver features are currently supported, so if you need these features meshlabserver is your only option. To use `run_meshlab` you need to define the following variables first:

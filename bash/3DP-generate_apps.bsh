@@ -18,6 +18,7 @@ swapYZ
 rename
 hollow
 half_bust_FFF
+platform_FFF
 "
 #center_x
 
@@ -32,6 +33,7 @@ simplify
 rename
 hollow
 half_bust_FFF
+platform_FFF
 "
 scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
 
@@ -102,11 +104,13 @@ Type=Application
     fi
 done
 
+# add pause to the end of certain apps, i.e. so you can review the output before closing.
 for a in $pause_apps ; do
     app_name="3DP-$a"
     echo "pause \"Hit any key to close window ... \"" >> "${app_name}.bsh"
 done
 
+# change verbosity of certain apps, e.g. for troubleshooting
 sed -i "s/verbosity=2/verbosity=6/" "3DP-hollow.bsh"
 sed -i "s/delete_TEMP3DP_files=\"true\"/delete_TEMP3DP_files=\"false\"/" "3DP-hollow.bsh"
 
