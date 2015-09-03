@@ -29,66 +29,12 @@
 #  5 = display output of "silent" programs, i.e. MeshLab (run_meshlab)
 #  6 = display certain variables for debugging purposes
 
-#delete_TEMP3DP_files="false" # keep temp files - set this in calling program instead
-
-# NOTE: sed does not seem to work on network shares, at least in rename. Models must be on local drive. Or maybe it is just ridiculously slow.
-
 if [ "$verbosity" -ge 6 ]; then
     echo \$0 = "$0"
-    echo \$1 = "$1"
     echo \$@ = "$@"
 fi
 
-##########Dependencies##########
-### 3D
-# MeshLab http://meshlab.sourceforge.net/ version 1.34BETA
-#   License: GPLv2
-# ADMesh https://github.com/admesh/admesh version 0.98.2
-#   License: GPLv2
-# OpenSCAD http://www.openscad.org/ version 2015.03
-#   License: GPLv2
-# Likely to be included in the future:
-# blender
-# slic3r and/or cura
-#
-### 2D
-# imagemagick http://www.imagemagick.org/ Used to pre-process images - TODO: switch to graphicsmagick
-# potrace & mkbitmap  http://potrace.sourceforge.net/ Used to trace bitmaps
-# autotrace http://autotrace.sourceforge.net/ Alternative bitmap tracing program
-# inkscape https://inkscape.org/ Used to convert svg to eps
-# pstoedit http://www.pstoedit.net/ Used to convert eps to dxf
-#
-### Bash shell, provided by Cygwin on Windows
-# supporting command line programs, such as bc, zip, etc.
-
-##########Check environment##########
-if [[ $(uname -s) == CYGWIN* ]]; then
-    ML_VERSION="1.3.4BETA" # MeshLab version, 1.3.3 or 1.3.4BETA or SVN
-    
-	# Set paths for dependencies
-	MESHLAB_PATH="/cygdrive/c/Program Files/VCG/MeshLab"
-	OPENSCAD_PATH="/cygdrive/c/Program Files/OpenSCAD"
-	ADMESH_PATH="/cygdrive/c/Program Files/admesh"
-	INKSCAPE_PATH="/cygdrive/c/Program Files/Inkscape"
-    
-	alias openscad="openscad.com"
-	alias inkscape="inkscape.com"
-	
-    #to copy & paste into cygwin session for interactive use
-    # PATH="/cygdrive/c/Program Files/VCG/MeshLab":"/cygdrive/c/Program Files/OpenSCAD":"/cygdrive/c/Program Files/Inkscape":"/cygdrive/c/Program Files/admesh":$PATH 
-	PATH=$MESHLAB_PATH:$OPENSCAD_PATH:$ADMESH_PATH:$INKSCAPE_PATH:$PATH
-elif [[ $(uname -s) == Linux* ]]; then
-    ML_VERSION="1.3.3" # MeshLab version, 1.3.3 or 1.3.4BETA or SVN
-#elif [ "$(uname)" == "Darwin" ]; then
-    # Do something under Mac OS X platform
-fi
-
-# Correct working directory & paths if script was launched from __.cmd file
-if [ "$CMD_LAUNCH" = "true" ]; then
-    unixpath="$(cygpath -u "$1")" #convert Windows path to cygwin path
-else
-    unixpath="$1"
-fi
+scriptpath="$(cd "$(dirname "$0")"; pwd -P)" # path of this script file
 
 ##Include sub scripts
 . ${scriptpath}/mlx.bsh
@@ -504,9 +450,8 @@ do_repair() {
     return $return_code
 }
 
-# Need to add capability to accept multiple input files
-# function to use openscad to perform a boolean union on multiple input files
 do_union() {
+    # function to use openscad to perform a boolean union on multiple input files
     echo ; echo "Performing a boolean union on the following meshes: "
     printf "    %s\n" "$@"
     
@@ -1199,25 +1144,20 @@ do_center_x () {
     return $return_code
 }
 
-
-#TODO: make UV2jpg script to convert UV textures to jpgs? Intent is to run this prior to uploading to services to decrease upload time.
-
-#TODO: running Patricia through admesh breaks model!
-
-#do_emboss
-
-#do_replace_texture
-#this should work by dragging an obj and the new texture on the file
-#should rename file by default; option to operate in place?
+# Correct working directory & paths if script was launched from __.cmd file
+if [ "$CMD_LAUNCH" = "true" ]; then
+    unixpath="$(cygpath -u "$1")" #convert Windows path to cygwin path
+else
+    unixpath="$1"
+fi
 
 ### Begin Find file paths
-scriptpath="$(cd "$(dirname "$0")"; pwd -P)" # path of this script file
 #use ${scriptpath%/*} to get parent directory
 fpath="${unixpath%/*}" # input file path
 cd "$fpath" # make the directory containing the input file the current directory
 fbase="${unixpath##*/}" # file basename (prefix+extension)
 
-#do_metadata "$fbase" # don't want to set this here because of do_rename
+# don't want to use do_metadata here because of do_rename
 parse_metadata "$fbase" # set initial fpref_full, fpref, m_scale, m_up
 set_meta # set initial meta value
 
@@ -1230,5 +1170,3 @@ fi
 if [ "$delete_TEMP3DP_files" = "true" ]; then
 	rm -f TEMP3DP_* # Delete all files with temp file prefix
 fi
-
-

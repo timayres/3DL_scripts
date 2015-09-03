@@ -4,6 +4,29 @@
 #functions and variables for running MeshLab and mlx scripts
 # filters are based on MeshLab v 1.3.4BETA for 64 bit Windows
 
+##Set program locations, ML_VERSION, aliases##
+if [[ $(uname -s) == CYGWIN* ]]; then
+    ML_VERSION="1.3.4BETA" # MeshLab version, 1.3.3 or 1.3.4BETA or SVN
+    
+	# Set paths for dependencies
+	MESHLAB_PATH="/cygdrive/c/Program Files/VCG/MeshLab"
+	OPENSCAD_PATH="/cygdrive/c/Program Files/OpenSCAD"
+	ADMESH_PATH="/cygdrive/c/Program Files/admesh"
+	#INKSCAPE_PATH="/cygdrive/c/Program Files/Inkscape"
+    
+	alias openscad="openscad.com"
+	#alias inkscape="inkscape.com"
+	
+    #to copy & paste into cygwin session for interactive use
+    # PATH="/cygdrive/c/Program Files/VCG/MeshLab":"/cygdrive/c/Program Files/OpenSCAD":"/cygdrive/c/Program Files/Inkscape":"/cygdrive/c/Program Files/admesh":$PATH 
+	PATH=$MESHLAB_PATH:$OPENSCAD_PATH:$ADMESH_PATH:$PATH #:$INKSCAPE_PATH
+elif [[ $(uname -s) == Linux* ]]; then
+    ML_VERSION="1.3.3" # MeshLab version, 1.3.3 or 1.3.4BETA or SVN
+#elif [ "$(uname)" == "Darwin" ]; then
+    # Do something under Mac OS X platform
+fi
+
+
 # REF: test if empty or not:
 # -z true if string is zero
 # -n true if string is non-zero
@@ -322,6 +345,10 @@ do_om () {
 }
 
 mlx_begin() {
+    if [ -z "$ml_SF" ]; then
+        ml_SF="TEMP3DP_default.mlx" # set a default script filename if none is already set
+    fi
+
     echo "<!DOCTYPE FilterScript>
 <FilterScript>" > "$ml_SF"
     case "${ml_IF##*.}" in # check file extension of input

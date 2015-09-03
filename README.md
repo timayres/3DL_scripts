@@ -52,22 +52,20 @@ Vertex colors are not currently explicitly supported. They may work fine, howeve
 ####Windows
 Download the repository and put it wherever you like.
 
-You will need to manually install the required dependencies; if you install them in a location different than described below you will need to edit the file "3DP-main.bsh" with the new locations.
+You will need to manually install the required dependencies; if you install them in a location different than described below you will need to edit `bash/mlx.bsh` with the new locations; edit `bash/3DP-generate_apps.bsh` to change the cygwin directory
 - [MeshLab](http://meshlab.sourceforge.net/) version 1.34BETA, C:/Program Files/VCG/MeshLab
 - [ADMesh](https://github.com/admesh/admesh) version 0.98.2, C:/Program Files/admesh
 - [OpenSCAD](http://www.openscad.org/) version 2015.03, C:/Program Files/OpenSCAD
-- [Cygwin](https://www.cygwin.com/), C:/cygwin64 (if different this location needs to be changed in 3DP-generate_apps.bsh, 3DP-generate_apps.cmd & 3DP-remove_apps.cmd)
+- [Cygwin](https://www.cygwin.com/), C:/cygwin64
   
 __Note that version 1.3.4BETA for 64 bit Windows is required.__ Older versions will mostly work but are missing some key features. Most notably, the measure geometry & measure topology filters do not work from meshlabserver in older versions (including 1.3.3), so any apps that depend on these will not work.
   
-After installing Cygwin, you can run the file `bash/3DP-cyg-install.bsh` to automatically install additional dependencies within Cygwin. Note that this uses [apt-cyg](https://github.com/transcode-open/apt-cyg) to install additional programs.
-
-To generate the app shortcuts, double click on `bash/3DP-generate_apps.cmd`. This will generate cmd files in the top directory suitable for dragging & dropping models on.
+After installing Cygwin, you can run the file `bash/3DP-cyg-install.bsh` to automatically install additional dependencies within Cygwin. Note that this uses [apt-cyg](https://github.com/transcode-open/apt-cyg) to install additional programs. After this completes run `bash/3DP-generate_apps.bsh` to generate the app scripts & shortcuts.
 
 ####Linux
 Linux is kinda sorta supported; I've actually given up on fully supporting Linux at the moment since it's just too hard to get the latest versions of software installed. For example, as of this writing (August 2015) the latest version of Meshlab packaged with Ubuntu (15.04) is 1.3.2, released over 3 years ago. There's a PPA for 1.3.3 but it's missing features. As noted above, MeshLab version 1.3.4BETA is needed for full support, however this was never released for Linux (even in source form), so what's needed is to compile a later version from SVN (but not TOO late or you'll encounter breakage). 
 
-In any case, after installing all dependencies run `bash/3DP-generate_apps.bsh` script to generate .desktop shortcuts that you can drag & drop models onto. If you can get a later version of MeshLab compiled it should work, or you can live with the reduced functionality of older versions.
+In any case, after installing all dependencies run `bash/3DP-generate_apps.bsh` to generate .desktop shortcuts that you can drag & drop models onto. If you can get a later version of MeshLab compiled it should work, or you can live with the reduced functionality of older versions.
 
 ####OS X
 OS X should work with a bit of work, again provided you can get an updated copy of MeshLab compiled & installed. However, I don't own a Mac and am unsure how to create files to support dragging & dropping, so you're on your own at the moment. Contributions welcome!
@@ -108,10 +106,10 @@ One particular use case is to take measurements of a mesh to input into OpenSCAD
 ### Usage
 Here is a general overview of how to use the functions to write your own scripts. You can also examine the 3DP app functions for practical examples.
 
-First define the variable `ml_SF` with the filename of the script file you want to create, for example `temp.mlx`. WARNING: if this filename already exists it will be overwritten.
+First define the variable `ml_SF` with the filename of the script file you want to create, for example `rotate.mlx`. WARNING: if this filename already exists it will be overwritten. If you do not set a filename it will use "TEMP3DP_default.mlx" as a default choice.
 
 ####Write the mlx script
-Functions that begin with `mlx` actually write xml code to the `ml_SF` filename.
+Functions that begin with `mlx` actually write xml code to the `ml_SF` mlx filename.
 
 `mlx_begin` - must always be the first mlx function called. This writes the opening tags, and also adds `mlx_merge_V` for stl files (this is the same as selecting "Unify Duplicate Vertices" when importing STLs in the gui).
 
@@ -136,16 +134,16 @@ mlx.bsh uses a few abbreviations to shorten names for common terms:
 - F = face, faces, facets
 - sel = select, selected
 - del = delete, deleted
-- parts = same as "components" in MeshLab (but fewer letters ;); some other programs call these "shells". These are any separate, unconnected geometries in the mesh.
+- parts = same as "components" in MeshLab (but fewer letters ;); other software calls these "shells". These are any separate, unconnected geometries in the mesh.
 - layer = MeshLab uses "layer" and "mesh" somewhat interchangeably. This isn't entirely correct, as a layer could contain something other than a mesh (e.g. a point cloud), so the more general term is used.
 
-MeshLab likes to give filters long and highly technical names; while accurate, this can be confusing for newcomers (and some oldtimers ;), and is a bit much to type out in scripts. Therefore, some filters have been renamed to give them shorter (and hopefully clearer) names. For example, filter "Quadric Edge Collapse Decimation" is called with the function `mlx_simplify`.
+MeshLab likes to give filters long and highly technical names; while accurate, this can be a bit obtuse to newcomers (and some oldtimers ;), and is a bit much to type out in scripts. Therefore, some filters have been renamed to give them shorter (and hopefully clearer) names. For example, filter "Quadric Edge Collapse Decimation" is called with the function `mlx_simplify`.
 
 Additional filter combinations are also included for convenience. For example, `mlx_del_small_parts` combines `mlx_sel_small_parts` with `mlx_del_sel_V_F`. 
 
-Some filters have additional features added or a different interface defined. For example, `mlx_simplify` will run a different version of the filter depending if the model has a UV texture. The mesh creation filters have been changed extensively to give them more of an OpenSCAD-like interface.
+Some filters have additional features added or a different interface defined. For example, `mlx_simplify` will automatically run a different version of the filter depending if the model has a UV texture. The mesh creation filters have been changed extensively to give them more of an OpenSCAD-like interface.
 
-All filter options are specified when calling the filter using the pattern `option=value`. Read the code to see specifics. All options that are available can be specified unless they serve no purpose in a script (such as the rotation snap angle). All options have default values so it is not required to specify any options at all (although for some filters such as the transformations a call with no options won't actually do anything). Please note that the default values are those we've found to be the most useful and may differ from MeshLab's defaults. Check first!
+All MeshLab filter options are specified as options when calling the function using the pattern `option=value`. Look in mlx.bsh code to see specific option names and default values. All options that are available in MeshLab can be specified unless they serve no purpose in a script (such as the rotation snap angle). All options have default values so it is not required to specify any options at all (although for some filters such as the transformations a call with no options won't actually do anything). Please note that the default values are those we've found to be the most useful and may differ from MeshLab's defaults. Check first!
 
 ####Run the script in meshlabserver
 You have two primary options to run mlx scripts, the `run_meshlab` function or just calling meshlabserver directly. A third option is to load and run the scripts in the GUI, which can be especially useful for debugging.
