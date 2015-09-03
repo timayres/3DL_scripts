@@ -16,6 +16,8 @@
 
 # TODO: check filenames for spaces
 
+# TODO: add color names
+
 #verbose="true" # Useful for debugging; set  to true
 #verbosity=6
 # verbosity

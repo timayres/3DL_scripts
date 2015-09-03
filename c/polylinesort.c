@@ -350,7 +350,7 @@ int main (int argc, char *argv[])
 void write_polyline()
   {
   // output file name
-  char filename[] = "polyline_%d.xyz";
+  char filename[] = "polyline%d.xyz";
 
   int j,k;
   int temp_point;
@@ -358,9 +358,9 @@ void write_polyline()
   char outfile[256];
 
   if (closed_polyline)
-    printf("Polyline %d is a closed polyline set of %d points \n", num_polylines, sort_cnt);
+    printf("Polyline %d is a closed polyline set of %d points \n", num_polylines - 1, sort_cnt);
   else
-    printf("Polyline %d is an open polyline set of %d points \n", num_polylines, sort_cnt);
+    printf("Polyline %d is an open polyline set of %d points \n", num_polylines - 1, sort_cnt);
 
   // print the sorted line sets
   for (j = 1, k = 0; j < sort_cnt; j++, k++)
@@ -368,7 +368,7 @@ void write_polyline()
   if (closed_polyline)
     printf("%d %d \n", sorted_points[k], sorted_points[0]);
 
-  sprintf(outfile, filename, num_polylines);
+  sprintf(outfile, filename, num_polylines - 1);
   remove(outfile);
 
   // open output file
@@ -384,6 +384,12 @@ void write_polyline()
   for (j = 0; j < sort_cnt; j++)
     {
     temp_point = sorted_points[j] - 1;
+    printf("%f %f %f \n", V[temp_point].x, V[temp_point].y, V[temp_point].z);
+    fprintf(fpo,"%f %f %f \n", V[temp_point].x, V[temp_point].y, V[temp_point].z);
+    }
+  if (closed_polyline)
+    {
+    temp_point = sorted_points[0] - 1;
     printf("%f %f %f \n", V[temp_point].x, V[temp_point].y, V[temp_point].z);
     fprintf(fpo,"%f %f %f \n", V[temp_point].x, V[temp_point].y, V[temp_point].z);
     }

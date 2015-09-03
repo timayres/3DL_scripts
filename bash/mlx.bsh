@@ -174,12 +174,13 @@ do_subfiles () {
 
     case "${1##*.}" in # check file extension of input
         [Oo][Bb][Jj] )
-            # Format: mtllib ./model_mesh.obj.mtl
+            # Texture Format: mtllib ./model_mesh.obj.mtl
             material_file=$(grep "mtllib" "$1" 2> /dev/null | cut -d" " -f2)
             material_file="${material_file##*/}" # strip out path
+            # Vector colors: "v" entries have 6 values instead of just 3 (last 3 are r g b)
     
             if [ -n "$material_file" ]; then
-                # Format: map_Kd model_texture.jpg
+                # Texture Format: map_Kd model_texture.jpg
                 # texture_files: array of texture image files
                 OIFS="$IFS"; IFS=$'\n'; texture_files=( $(grep "map_Kd" "$material_file" | cut -d" " -f2) ); IFS="$OIFS"
                 OIFS="$IFS"; IFS=$'\n'; texture_files_unique=( $(sort -u <<< "${texture_files[*]}") ); IFS="$OIFS"
@@ -198,7 +199,7 @@ do_subfiles () {
             texture_files=()
             ;;
         [Xx]3[Dd] )
-            # Format: <ImageTexture url="model_texture.jpg"/>
+            # Texture Format: <ImageTexture url="model_texture.jpg"/>
             OIFS="$IFS"; IFS=$'\n'; texture_files=( $(grep "ImageTexture" "$1" | cut -d"\"" -f2) ); IFS="$OIFS"
             OIFS="$IFS"; IFS=$'\n'; texture_files_unique=( $(sort -u <<< "${texture_files[*]}") ); IFS="$OIFS"
             if [ "$verbosity" -ge 2 ]; then
@@ -210,11 +211,24 @@ do_subfiles () {
             fi
             ;;
         [Dd][Aa][Ee] ) # COLLADA
-            # Format: <ImageTexture url="model_texture.jpg"/>
-            # Format:   <image id="texture0" name="texture0">
+            # Texture Format:   <image id="texture0" name="texture0">
             #               <init_from>model_texture.jpg</init_from>
             #           </image>
+            # TODO: use xmlstarlet to parse this
             OIFS="$IFS"; IFS=$'\n'; texture_files=( $(grep "ImageTexture" "$1" | cut -d"\"" -f2) ); IFS="$OIFS"
+            OIFS="$IFS"; IFS=$'\n'; texture_files_unique=( $(sort -u <<< "${texture_files[*]}") ); IFS="$OIFS"
+            if [ "$verbosity" -ge 2 ]; then
+                echo
+                echo "Number of texture file(s): " ${#texture_files[@]}
+                echo "Number of unique texture file(s): " ${#texture_files_unique[@]}
+                echo "Texture file(s): " ${texture_files[@]}
+                echo "Unique Texture file(s): " ${texture_files_unique[@]}
+            fi
+            ;;
+        [pP][lL][yY] ) # Need to convert to ascii before reading? Maybe not! Header is in ascii
+            # Texture Format: comment TextureFile model_texture.jpg
+            # Is this unique to MeshLab? How does other software identify where the texture file is?
+            OIFS="$IFS"; IFS=$'\n'; texture_files=( $(grep -a "TextureFile" "$1" | cut -d" " -f3) ); IFS="$OIFS"
             OIFS="$IFS"; IFS=$'\n'; texture_files_unique=( $(sort -u <<< "${texture_files[*]}") ); IFS="$OIFS"
             if [ "$verbosity" -ge 2 ]; then
                 echo
@@ -234,8 +248,10 @@ do_subfiles () {
     ## Vertex colors could be added in the future
     if [ ${#texture_files_unique[@]} -ne 0 ]; then
         m_color="UV"
+        color_UV="true"
     else
         m_color="NC"
+        color_UV="false"
     fi
     
     if [ ${#texture_files[@]} -gt 1 ]; then
@@ -250,6 +266,7 @@ do_om () {
     # Function to set MeshLab output mask -m options
     # Usage: the file extension as input to this program
     # TODO: Add additional file type support in the future, e.g. ply
+    # TODO: does it do any harm to define vc even if there are none?
 
     # MeshLab output mask (-m) options:
     # Note: v1.34BETA changed -om switch to -m
@@ -274,17 +291,21 @@ do_om () {
     
     case "$1" in
         [Oo][Bb][Jj] )
-            if [ "$m_color" = "UV" ]; then
+            if [ "$m_color" = "UV" ] || [ "$color_UV" = "true" ]; then
                 om="$om_flag vc vn fc wt" # colored texture
             else
-                om="$om_flag vn" # no colors
+                om="$om_flag vc vn" # no colors, or vc only # TODO: test this out!
             fi
             ;;
         [Ss][Tt][Ll] | [Xx][Yy][Zz] | [Dd][Xx][Ff] )
             om="" # no colors or other options; will be exported as binary
             ;;
-        [Pp][Ll][Yy] ) #TODO: check this!
-            om="$om_flag vc vn wt" # textured ply; will be exported as binary
+        [Pp][Ll][Yy] ) #TODO: check this! Available options: vf, vc, vn, ff
+            if [ "$m_color" = "UV" ] || [ "$color_UV" = "true" ]; then
+                om="$om_flag vc vn wt" # textured ply; will be exported as binary
+            else
+                om="$om_flag vc vn" 
+            fi
             ;;
         [Xx]3[Dd] )
             om="$om_flag vc vn wt" # textured x3d
@@ -2248,58 +2269,66 @@ mlx_hausdorff_distance() {
 
 mlx_sampling_pd() { # Poisson-disk Sampling
     # Options & Defaults
-    local sample_num # The desired number of samples. The ray of the disk is calculated according to the sampling density.
-    local radius # If not zero this parameter override the previous parameter to allow exact radius specification, max=BBdiag
-    local montecarloRate # The over-sampling rate that is used to generate the intial Montecarlo samples (e.g. if this parameter is &lt;i>K&lt;/i> means that&lt;i>K&lt;/i> x &lt;i>poisson sample&lt;/i> points will be used). The generated Poisson-disk samples are a subset of these initial Montecarlo samples. Larger this number slows the process but make it a bit more accurate.
-    local saveMontecarlo # If true, it will generate an additional Layer with the montecarlo sampling that was pruned to build the poisson distribution.
-    local ApproximateGeodesicDistance # If true Poisson Disc distances are computed using an approximate geodesic distance, e.g. an euclidean distance weighted by a function of the difference between the normals of the two points.
-    local subsample # If true the original vertices of the base mesh are used as base set of points. In this case the SampleNum should be obviously much smaller than the original vertex number.&lt;br>Note that this option is very useful in the case you want to subsample a dense point cloud.
-    local refine # If true the vertices of the below mesh are used as starting vertices, and they will utterly refined by adding more and more points until possible.
-    local refineMesh # Used only if the above option is checked.
-    local bestSample # If true it will use a simple heuristic for choosing the samples. At a small cost (it can slow a bit the process) it usually improve the maximality of the generated sampling.
-    local bestSamplePool # Used only if the Best Sample Flag is true. It control the number of attempt that it makes to get the best sample. It is reasonable that it is smaller than the Montecarlo oversampling factor.
-    local exactNum # If requested it will try to do a dicotomic search for the best poisson disk radius that will generate the requested number of samples with a tolerance of the 0.5%. Obviously it takes much longer.
-    local radiusVariance # The radius of the disk is allowed to vary between r and r*var. If this parameter is 1 the sampling is the same of the Poisson Disk Sampling.
+    local sample_num=1000 # The desired number of samples. The ray of the disk is calculated according to the sampling density.
+    local radius=0 # If not zero this parameter override the previous parameter to allow exact radius specification, max=BBdiag
+    local montecarloRate=20 # The over-sampling rate that is used to generate the intial Montecarlo samples (e.g. if this parameter is &lt;i>K&lt;/i> means that&lt;i>K&lt;/i> x &lt;i>poisson sample&lt;/i> points will be used). The generated Poisson-disk samples are a subset of these initial Montecarlo samples. Larger this number slows the process but make it a bit more accurate.
+    local saveMontecarlo="false" # If true, it will generate an additional Layer with the montecarlo sampling that was pruned to build the poisson distribution.
+    local approxGeodesicDist="false" # If true Poisson Disc distances are computed using an approximate geodesic distance, e.g. an euclidean distance weighted by a function of the difference between the normals of the two points.
+    local subsample="false" # If true the original vertices of the base mesh are used as base set of points. In this case the SampleNum should be obviously much smaller than the original vertex number.&lt;br>Note that this option is very useful in the case you want to subsample a dense point cloud.
+    local refine="false" # If true the vertices of the below mesh are used as starting vertices, and they will utterly refined by adding more and more points until possible.
+    local refineMesh=0 # Used only if the above option is checked.
+    local bestSample="true" # If true it will use a simple heuristic for choosing the samples. At a small cost (it can slow a bit the process) it usually improve the maximality of the generated sampling.
+    local bestSamplePool=10 # Used only if the Best Sample Flag is true. It control the number of attempt that it makes to get the best sample. It is reasonable that it is smaller than the Montecarlo oversampling factor.
+    local exactNum="false" # If requested it will try to do a dicotomic search for the best poisson disk radius that will generate the requested number of samples with a tolerance of the 0.5%. Obviously it takes much longer.
+    local radiusVariance=1 # The radius of the disk is allowed to vary between r and r*var. If this parameter is 1 the sampling is the same of the Poisson Disk Sampling.
     
     # Other
     local i
     
     for i in "$@"; do
         case $i in
-            sampled[lL]ayer=*)
-                sampledLayer="${i#*=}"
-                shift # past argument=value
-                ;;
-            target[lL]ayer=*)
-                targetLayer="${i#*=}"
-                shift # past argument=value
-                ;;
-            save[sS]ample=*|save=*)
-                saveSample="${i#*=}"
-                shift # past argument=value
-                ;;
-            sample_V=*)
-                sample_V="${i#*=}"
-                shift # past argument=value
-                ;;
-            sample_E=*)
-                sample_E="${i#*=}"
-                shift # past argument=value
-                ;;
-            sample_fauxE=*)
-                sample_fauxE="${i#*=}"
-                shift # past argument=value
-                ;;
-            sample_F=*)
-                sample_F="${i#*=}"
-                shift # past argument=value
-                ;;
             sample_num=*)
                 sample_num="${i#*=}"
                 shift # past argument=value
                 ;;
-            maxdist=*)
-                maxdist="${i#*=}"
+            r=*|radius=*)
+                radius="${i#*=}"
+                shift # past argument=value
+                ;;
+            montecarlo[rR]ate=*)
+                montecarloRate="${i#*=}"
+                shift # past argument=value
+                ;;
+            save[mM]ontecarlo=*)
+                saveMontecarlo="${i#*=}"
+                shift # past argument=value
+                ;;
+            approx[gG]eodesic[dD]ist=*)
+                approxGeodesicDist="${i#*=}"
+                shift # past argument=value
+                ;;
+            subsample=*)
+                subsample="${i#*=}"
+                shift # past argument=value
+                ;;
+            refine=*)
+                refine="${i#*=}"
+                shift # past argument=value
+                ;;
+            refineMesh=*)
+                refineMesh="${i#*=}"
+                shift # past argument=value
+                ;;
+            best[sS]ample[pP]ool=*)
+                bestSamplePool="${i#*=}"
+                shift # past argument=value
+                ;;
+            exact[nN]um=*)
+                exactNum="${i#*=}"
+                shift # past argument=value
+                ;;
+            radius[vV]ariance=*)
+                radiusVariance="${i#*=}"
                 shift # past argument=value
                 ;;
             *)
@@ -2310,18 +2339,18 @@ mlx_sampling_pd() { # Poisson-disk Sampling
     
     echo "\
     <filter name=\"Poisson-disk Sampling\">
-        <Param name=\"SampleNum\" description=\"Number of samples\" value=\"1000\" type=\"RichInt\" tooltip=\"The desired number of samples. The ray of the disk is calculated according to the sampling density.\"/>
-        <Param name=\"Radius\" description=\"Explicit Radius\" value=\"0\" min=\"0\" max=\"71.7257\" type=\"RichAbsPerc\" tooltip=\"If not zero this parameter override the previous parameter to allow exact radius specification\"/>
-        <Param name=\"MontecarloRate\" description=\"MonterCarlo OverSampling\" value=\"20\" type=\"RichInt\" tooltip=\"The over-sampling rate that is used to generate the intial Montecarlo samples (e.g. if this parameter is &lt;i>K&lt;/i> means that&lt;i>K&lt;/i> x &lt;i>poisson sample&lt;/i> points will be used). The generated Poisson-disk samples are a subset of these initial Montecarlo samples. Larger this number slows the process but make it a bit more accurate.\"/>
-        <Param name=\"SaveMontecarlo\" description=\"Save Montecarlo\" value=\"false\" type=\"RichBool\" tooltip=\"If true, it will generate an additional Layer with the montecarlo sampling that was pruned to build the poisson distribution.\"/>
-        <Param name=\"ApproximateGeodesicDistance\" description=\"Approximate Geodesic Distance\" value=\"false\" type=\"RichBool\" tooltip=\"If true Poisson Disc distances are computed using an approximate geodesic distance, e.g. an euclidean distance weighted by a function of the difference between the normals of the two points.\"/>
-        <Param name=\"Subsample\" description=\"Base Mesh Subsampling\" value=\"false\" type=\"RichBool\" tooltip=\"If true the original vertices of the base mesh are used as base set of points. In this case the SampleNum should be obviously much smaller than the original vertex number.&lt;br>Note that this option is very useful in the case you want to subsample a dense point cloud.\"/>
-        <Param name=\"RefineFlag\" description=\"Refine Existing Samples\" value=\"false\" type=\"RichBool\" tooltip=\"If true the vertices of the below mesh are used as starting vertices, and they will utterly refined by adding more and more points until possible. \"/>
-        <Param name=\"RefineMesh\" description=\"Samples to be refined\" value=\"0\" type=\"RichMesh\" tooltip=\"Used only if the above option is checked. \"/>
-        <Param name=\"BestSampleFlag\" description=\"Best Sample Heuristic\" value=\"true\" type=\"RichBool\" tooltip=\"If true it will use a simple heuristic for choosing the samples. At a small cost (it can slow a bit the process) it usually improve the maximality of the generated sampling. \"/>
-        <Param name=\"BestSamplePool\" description=\"Best Sample Pool Size\" value=\"10\" type=\"RichInt\" tooltip=\"Used only if the Best Sample Flag is true. It control the number of attempt that it makes to get the best sample. It is reasonable that it is smaller than the Montecarlo oversampling factor.\"/>
-        <Param name=\"ExactNumFlag\" description=\"Exact number of samples\" value=\"false\" type=\"RichBool\" tooltip=\"If requested it will try to do a dicotomic search for the best poisson disk radius that will generate the requested number of samples with a tolerance of the 0.5%. Obviously it takes much longer.\"/>
-        <Param name=\"RadiusVariance\" description=\"Radius Variance\" value=\"1\" type=\"RichFloat\" tooltip=\"The radius of the disk is allowed to vary between r and r*var. If this parameter is 1 the sampling is the same of the Poisson Disk Sampling\"/>
+        <Param name=\"SampleNum\" description=\"Number of samples\" value=\"$sample_num\" type=\"RichInt\" tooltip=\"The desired number of samples. The ray of the disk is calculated according to the sampling density.\"/>
+        <Param name=\"Radius\" description=\"Explicit Radius\" value=\"$radius\" min=\"0\" max=\"100\" type=\"RichAbsPerc\" tooltip=\"If not zero this parameter override the previous parameter to allow exact radius specification\"/>
+        <Param name=\"MontecarloRate\" description=\"MonterCarlo OverSampling\" value=\"$montecarloRate\" type=\"RichInt\" tooltip=\"The over-sampling rate that is used to generate the intial Montecarlo samples (e.g. if this parameter is &lt;i>K&lt;/i> means that&lt;i>K&lt;/i> x &lt;i>poisson sample&lt;/i> points will be used). The generated Poisson-disk samples are a subset of these initial Montecarlo samples. Larger this number slows the process but make it a bit more accurate.\"/>
+        <Param name=\"SaveMontecarlo\" description=\"Save Montecarlo\" value=\"$saveMontecarlo\" type=\"RichBool\" tooltip=\"If true, it will generate an additional Layer with the montecarlo sampling that was pruned to build the poisson distribution.\"/>
+        <Param name=\"ApproximateGeodesicDistance\" description=\"Approximate Geodesic Distance\" value=\"$approxGeodesicDist\" type=\"RichBool\" tooltip=\"If true Poisson Disc distances are computed using an approximate geodesic distance, e.g. an euclidean distance weighted by a function of the difference between the normals of the two points.\"/>
+        <Param name=\"Subsample\" description=\"Base Mesh Subsampling\" value=\"$subsample\" type=\"RichBool\" tooltip=\"If true the original vertices of the base mesh are used as base set of points. In this case the SampleNum should be obviously much smaller than the original vertex number.&lt;br>Note that this option is very useful in the case you want to subsample a dense point cloud.\"/>
+        <Param name=\"RefineFlag\" description=\"Refine Existing Samples\" value=\"$refine\" type=\"RichBool\" tooltip=\"If true the vertices of the below mesh are used as starting vertices, and they will utterly refined by adding more and more points until possible. \"/>
+        <Param name=\"RefineMesh\" description=\"Samples to be refined\" value=\"$refineMesh\" type=\"RichMesh\" tooltip=\"Used only if the above option is checked. \"/>
+        <Param name=\"BestSampleFlag\" description=\"Best Sample Heuristic\" value=\"$bestSample\" type=\"RichBool\" tooltip=\"If true it will use a simple heuristic for choosing the samples. At a small cost (it can slow a bit the process) it usually improve the maximality of the generated sampling. \"/>
+        <Param name=\"BestSamplePool\" description=\"Best Sample Pool Size\" value=\"$bestSamplePool\" type=\"RichInt\" tooltip=\"Used only if the Best Sample Flag is true. It control the number of attempt that it makes to get the best sample. It is reasonable that it is smaller than the Montecarlo oversampling factor.\"/>
+        <Param name=\"ExactNumFlag\" description=\"Exact number of samples\" value=\"$exactNum\" type=\"RichBool\" tooltip=\"If requested it will try to do a dicotomic search for the best poisson disk radius that will generate the requested number of samples with a tolerance of the 0.5%. Obviously it takes much longer.\"/>
+        <Param name=\"RadiusVariance\" description=\"Radius Variance\" value=\"$radiusVariance\" type=\"RichFloat\" tooltip=\"The radius of the disk is allowed to vary between r and r*var. If this parameter is 1 the sampling is the same of the Poisson Disk Sampling\"/>
     </filter>" >> "$ml_SF"
 }
 
