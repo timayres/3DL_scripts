@@ -14,10 +14,8 @@ delete_TEMP3DP_files="true"
 # if [ 1 ]; then # ON, any number or string is true
 # if [ ]; then # OFF, NULL is false
 
-if [ 1 ]; then
-    if [ -z "$1" ]; then 
-        set "${scriptpath}/../test_models/PLANE.obj" # Sets 1st positional parameter, use absolute path 
-    fi
+if [ -z "$1" ]; then 
+    set "${scriptpath}/../test_models/PLANE.obj" # Sets 1st positional parameter, use absolute path 
 fi
 
 . ${scriptpath}/3DP-main.bsh
@@ -68,11 +66,11 @@ if [  ]; then
 fi
 
 # Create Captain America's shield in MeshLab 2D vertex colored surfaces!
-if [  ]; then
+if [ 1 ]; then
     fn=50 # set number or segments to use for circles
     ml_IF="$fbase"
     ml_SF="TEMP3DP_shield.mlx"
-    ml_OF="shield.obj"
+    ml_OF="shield.ply"
     mlx_begin
     mlx_del_layer
     
@@ -83,7 +81,7 @@ if [  ]; then
     p=$(bc -l ${scriptpath}/funcs.bc <<< "scale=10;($r/(1 + tan(36*pi()/180)/tan(18*pi()/180)))") # distance from center to pentagon edge midpoint
     w=$(bc -l ${scriptpath}/funcs.bc <<< "scale=10;($p*tan(36*pi()/180))") # 1/2 width of pentagon edge/outer triangle bottom
     h=$(bc -l ${scriptpath}/funcs.bc <<< "scale=10;($w/tan(18*pi()/180))") # height of outer triangle
-
+    
     for ((i=1; i <= 5 ; i++)); do
         mlx_square s=$(bc <<< "scale=10;(sqrt(2))") center=true # create square so length from center to vertices is 1, so side length of sqrt(2)
         mlx_rotate z=45
@@ -92,20 +90,19 @@ if [  ]; then
         mlx_rotate z=$(bc <<< "scale=10;($i*72)")
     done
     mlx_flatten_layers # flatten star
+    mlx_color_V color=white
     mlx_translate z=.001 # translate start up slightly so it doesn't overlap circle
     
-    mlx_circle r=2
-    mlx_color_V b=255
-    mlx_circle r1=3 r2=2
-    mlx_color_V r=255
-    mlx_circle r1=4 r2=3
-    mlx_circle r1=5 r2=4
-    mlx_color_V r=255
+    mlx_circle r=2 color=blue
+    mlx_circle r1=3 r2=2 color=red
+    mlx_circle r1=4 r2=3 color=white
+    mlx_circle r1=5 r2=4 color=red
     
     mlx_flatten_layers
     mlx_end
     
-    meshlabserver -i "$ml_IF" -o "$ml_OF" -m vn vc  -s "$ml_SF"
+    run_meshlab
+    #meshlabserver -i "$ml_IF" -o "$ml_OF" -m vn vc  -s "$ml_SF"
     return_code=$?
     if [ $return_code -ne 0 ]; then
         pause "Uh oh, looks like there's an error. Hit any key to keep going anyway ... "
@@ -113,16 +110,32 @@ if [  ]; then
 fi
 
 # test out various functions before adding them to 3DP-generate_apps.bsh
-if [ 1 ]; then
+if [  ]; then
     #do_measure_dimension   y=2 $1 z=5
     #${scriptpath}/../c/polylinesort.bsh test_outline_closed.obj
     #${scriptpath}/../c/polylinesort.exe polylinesort.test
     #${scriptpath}/../c/polylinesort.exe test_4_outlines_closed.obj
 
-    do_polylinesort test_4_outlines_closed.obj
+    do_polylinesort polylinesort_square_test.obj
     #do_polylinesort polylinesort.test
 
     #do_half_bust_FFF "$fbase"
 fi
+
+if [  ]; then
+    echo 
+    color=babababa
+    color_name=$(grep -w "$color" "${scriptpath}/color_names.txt")
+    echo color_name = \"$color_name\"
+    r=$(echo "$color_name" | cut -d" " -f3)
+    g=$(echo "$color_name" | cut -d" " -f4)
+    b=$(echo "$color_name" | cut -d" " -f5)
+    
+    echo r=$r, g=$g, b=$b
+    #while read color_name hex r g b; do
+        #r=$r
+    
+fi
+
 
 pause

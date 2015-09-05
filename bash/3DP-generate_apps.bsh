@@ -164,3 +164,11 @@ if [ "$gen_mlx_scratch_shortcuts" = "true" ]; then
         gen_desktop_top "mlx_scratch"
      fi
 fi
+
+#for a in $scriptpath/* ; do
+#    dos2unix "$a"
+#done
+
+#dos2unix *
+
+#pause

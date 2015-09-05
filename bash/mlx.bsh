@@ -2165,7 +2165,7 @@ mlx_circle() { #2D
     # Options & Defaults
     local radius1=1 # Outer radius of the circle
     local radius2=0 # Inner radius of the circle (if non-zero it creates an annulus)
-    
+    local color="" # specify a color name to apply vertex olors to the newly created mesh
     # Other
     local i
     
@@ -2194,6 +2194,10 @@ mlx_circle() { #2D
                 fn="${i#*=}"
                 shift # past argument=value
                 ;;
+            color=*)
+                color="${i#*=}"
+                shift # past argument=value
+                ;;
             *)
                 # unknown option
                 ;;
@@ -2208,6 +2212,9 @@ mlx_circle() { #2D
         <Param name=\"externalRadius\" description=\"External Radius\" value=\"$radius1\" type=\"RichFloat\" tooltip=\"External Radius of the annulus\"/>
         <Param name=\"sides\" description=\"Sides\" value=\"$fn\" type=\"RichInt\" tooltip=\"Number of the sides of the poligonal approximation of the annulus\"/>
     </filter>" >> "$ml_SF"
+    if [ -n "$color" ]; then
+        mlx_color_V color="$color"
+    fi    
 }
 
 ### End Create ###
@@ -2397,6 +2404,8 @@ mlx_color_V() {
     
     # Other
     local i
+    local color
+    local color_name
     
     for i in "$@"; do
         case $i in
@@ -2414,6 +2423,18 @@ mlx_color_V() {
                 ;;
             [aA]=*|alpha=*)
                 a="${i#*=}"
+                shift # past argument=value
+                ;;
+            color=*)
+                color="${i#*=}"
+                color_name=$(grep -w "$color" "${scriptpath}/color_names.txt")
+                if [ -z "$color_name" ]; then
+                    echo "Color \"$color\" not found, not setting any color"
+                    return 1
+                fi
+                r=$(echo "$color_name" | cut -d" " -f3)
+                g=$(echo "$color_name" | cut -d" " -f4)
+                b=$(echo "$color_name" | cut -d" " -f5)
                 shift # past argument=value
                 ;;
             *)

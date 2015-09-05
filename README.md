@@ -106,7 +106,7 @@ One particular use case is to take measurements of a mesh to input into OpenSCAD
 ### Usage
 Here is a general overview of how to use the functions to write your own scripts. You can also examine the 3DP app functions for practical examples.
 
-First define the variable `ml_SF` with the filename of the script file you want to create, for example `rotate.mlx`. WARNING: if this filename already exists it will be overwritten. If you do not set a filename it will use "TEMP3DP_default.mlx" as a default choice.
+First define the variable `ml_SF` with the filename of the script file you want to create, for example `rotate.mlx`. WARNING: if this filename already exists it will be overwritten. If you do not set a filename it will use "TEMP3DP_default.mlx".
 
 ####Write the mlx script
 Functions that begin with `mlx` actually write xml code to the `ml_SF` mlx filename.

@@ -25,16 +25,21 @@ orig_zmin=-49.550304;
 orig_zmax=68.177139;
 /**********CUT LINE**********/
 // Everything above this line will be replaced by calling script
+
 // License: LGPLv2.1
 
 //embedded variables
 eps=0.00001; //overlap amount for correct booleans
 //function pi()=3.14159265358979323846;
 
-//top knob for Neil Enterprises Photo Bobble Heads
-//default spring length: ~42mm;
+//top post for spring
 
-// inner post and spring guide
+//Spring dimensions:
+// Free length=1.5"
+// OD=0.48"
+// Wire OD=0.035"
+
+// inner post and spring guide - 1:4 scale
 spring_length=40.5; //1.57" Includes bit of bottom post too
 fn_post=32; //number of segments in post
 post_r=14/2;//12.5/2;
@@ -43,11 +48,7 @@ spring_guide_top_dia=9.5;
 spring_guide_bottom_dia=9;
 spring_guide_height=8;
 
-//Spring dimensions (NE)
-//ID=11.3 mm .44"
-//OD=13.5mm .53"
-//wire diameter: 1 mm .04"
-// No. turns: 5-7
+// inner post and spring guide - 1:7 scale
 
 //Calculations
 orig_xsize=orig_xmax-orig_xmin;
