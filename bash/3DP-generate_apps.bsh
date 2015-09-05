@@ -15,7 +15,7 @@ gcc -Wall ../c/polylinesort.c -o ../c/polylinesort
 gen_mlx_scratch_shortcuts="true"
 
 apps="
-2x3dz
+2daez
 2objz
 2objNC
 check_mesh
@@ -33,7 +33,7 @@ platform_FFF
 
 # apps we want to pause at the end of
 pause_apps="
-2x3dz
+2daez
 2objz
 check_mesh
 pricing

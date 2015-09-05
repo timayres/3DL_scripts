@@ -237,8 +237,7 @@ do_subfiles () {
             # Texture Format:   <image id="texture0" name="texture0">
             #               <init_from>model_texture.jpg</init_from>
             #           </image>
-            # TODO: use xmlstarlet to parse this
-            OIFS="$IFS"; IFS=$'\n'; texture_files=( $(grep "ImageTexture" "$1" | cut -d"\"" -f2) ); IFS="$OIFS"
+            OIFS="$IFS"; IFS=$'\n'; texture_files=( $(xmlstarlet sel -N x=http://www.collada.org/2005/11/COLLADASchema -t -v "x:COLLADA/x:library_images/x:image/x:init_from" "$1") ); IFS="$OIFS"
             OIFS="$IFS"; IFS=$'\n'; texture_files_unique=( $(sort -u <<< "${texture_files[*]}") ); IFS="$OIFS"
             if [ "$verbosity" -ge 2 ]; then
                 echo

@@ -931,7 +931,7 @@ do_2x3dz () {
     
     echo ; echo "Converting to x3d: "
     ml_IF="$1"
-    ml_OF="${fpref_full}.x3d"    
+    ml_OF="${fpref_full}.x3d"
     ml_SF=""
     run_meshlab
 
@@ -951,7 +951,29 @@ do_2x3dz () {
 }
 
 do_2daez () {
-echo 
+    # "2daez: this function converts a model to Collada dae format and wraps it along with the associated texture file into a zip file. Primarily intended for submitting color models to Shapeways."
+    
+    local return_code
+    
+    echo ; echo "Converting to Collada dae: "
+    ml_IF="$1"
+    ml_OF="${fpref_full}.dae"
+    ml_SF=""
+    run_meshlab
+
+    do_subfiles "$ml_OF"
+    return_code=$?
+    
+    echo ; echo "Zipping up files ..."
+    # zip up files
+    # zip output.zip input1 input2 input3
+    zip "${fpref_full}.dae.zip" "$ml_OF" ${texture_files_unique[@]}
+    return_code=$?
+    
+    rm -f "$ml_OF" # delete dae file
+
+    return_file="${fpref_full}.dae.zip"
+    return $return_code
 }
 
 do_2objz () {
@@ -1173,7 +1195,7 @@ fpath="${unixpath%/*}" # input file path
 cd "$fpath" # make the directory containing the input file the current directory
 fbase="${unixpath##*/}" # file basename (prefix+extension)
 
-# don't want to use do_metadata here because of do_rename
+# don't want to use do_metadata here because of do_rename & conversion scripts
 parse_metadata "$fbase" # set initial fpref_full, fpref, m_scale, m_up
 set_meta # set initial meta value
 
