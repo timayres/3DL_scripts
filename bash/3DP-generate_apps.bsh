@@ -62,7 +62,7 @@ echo \"Starting ${1} on file \\\"\${fbase}\\\" ... \"
 do_${2} \"\$fbase\"
 
 if [ \"\$delete_TEMP3DP_files\" = \"true\" ]; then
-    rm -f TEMP3DP_*
+    rm -f TEMP3DP*
 fi
 
 main_end_time=\$(date +%s.%N)

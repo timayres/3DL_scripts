@@ -259,9 +259,6 @@ do_h2_to_offset() { # OpenSCAD
     #Prepare scad program
     do_h2_to_offset_scad_OF="TEMP3DP_${fpref}_H2-to_offset${meta}.scad" # set scad file name
     
-    
-    
-    
     case "$bottom_type" in
         1 | 4 | 5 | 6 ) #open & closed bottoms
             if [ "$bottom_type" = "1" ]; then
@@ -445,9 +442,6 @@ do_h3_offset() { # MeshLab
     do_h3_offset_OF="$2"
     
     # 1st offset
-    
-    #mlx_offset_multisample="false"
-    #mlx_subdivide_Iterations="1"
     
     echo ; echo "Offsetting mesh: "    
     ml_IF="$do_h3_offset_IF"

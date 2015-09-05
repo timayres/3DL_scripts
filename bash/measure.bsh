@@ -123,10 +123,7 @@ do_measure_dimension() {
     offset1=0
     offset2=0
     
-    #TODO: use same format of x=, y= for this function
-    
     echo ; echo "  Measuring dimension ... "
-    
     for i in "$@"; do
         case $i in
             [xX]=*)
@@ -290,10 +287,6 @@ do_polylinesort() {
                 # elif (( $(bc <<< "$z < ${polyline_zmin[$i]}") )); then
                     # polyline_zmin[$i]=$z
                 # fi
-
-                # TODO: try out c style double parentheses instead
-                # if (( $(bc <<< "$x > polyline_xmax[$i]") == 1 )); then
-                # if (( $(bc <<< "$x > polyline_xmax[$i]") )); then
                 
             fi
             #echo polyline[$i] = ${polyline[$i]}
@@ -310,8 +303,6 @@ do_polylinesort() {
     #echo ; echo polyline 2,1 ${polyline[2,1]}
     #echo "polyline_xmax=" ${polyline_xmax[@]}
     #echo "polyline_xmin=" ${polyline_xmin[@]}
-    
-    
     
     i=0
     echo "polygon(points=[${polyline[$i]}]); " > polygons.scad

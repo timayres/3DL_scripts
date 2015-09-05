@@ -68,11 +68,12 @@ fi
 # Create Captain America's shield in MeshLab 2D vertex colored surfaces!
 if [ 1 ]; then
     fn=50 # set number or segments to use for circles
-    ml_IF="$fbase"
+    #ml_IF="$fbase"
+    ml_IF=""
     ml_SF="TEMP3DP_shield.mlx"
     ml_OF="shield.ply"
     mlx_begin
-    mlx_del_layer
+    #mlx_del_layer
     
     # Create star by scaling 5 squares into diamonds & rotating them around
     

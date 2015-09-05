@@ -8,15 +8,13 @@
 # TODO: remove do_ prefix?
 
 
-# TODO: write script to generate test models?
+# TODO: write script to generate test models? At least write mlp file to translate model for bobblehead testing
 
 # TODO: parse ADMesh output
 
 # TODO: if mesh volume is negative, flip normals (in measure volume)
 
 # TODO: check filenames for spaces
-
-# TODO: add color names
 
 #verbose="true" # Useful for debugging; set  to true
 #verbosity=6
@@ -420,7 +418,25 @@ do_repair() {
     local line_no
     local return_code
     
+    do_metadata "$1"
+    orig_IF="$1"
+    repaired_OF="${fpref}-repaired${meta}.${1##*.}"
+    
     do_measure_all "$1"
+    
+    repair="true"
+    while [ "$repair" = "true" ]; do
+        echo ; echo "Original file: ${1}"
+        echo "Repaired file: ${repaired_OF}"
+        
+        echo ; echo "Script to try to repair mesh models. Select from the options below:"
+        echo "   1 - delete small parts"
+        echo "   2 - merge close vertcies"
+        echo "   3 - fix non-manifold edges"   
+    
+    
+    done
+    
     
     
     
@@ -1168,5 +1184,5 @@ fi
 
 ###Remove temp files
 if [ "$delete_TEMP3DP_files" = "true" ]; then
-	rm -f TEMP3DP_* # Delete all files with temp file prefix
+	rm -f TEMP3DP* # Delete all files with temp file prefix
 fi

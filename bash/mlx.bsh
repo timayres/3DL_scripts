@@ -26,7 +26,6 @@ elif [[ $(uname -s) == Linux* ]]; then
     # Do something under Mac OS X platform
 fi
 
-
 # REF: test if empty or not:
 # -z true if string is zero
 # -n true if string is non-zero
@@ -44,6 +43,7 @@ fi
 
 
 ###Initialize variables for run_meshlab
+ml_IF="" #input filename
 ml_OF="" #output filename
 ml_SF="" #filename for .mlx filter script
 ml_LF="" #filename for ML log
@@ -91,7 +91,7 @@ run_meshlab() {
             #if [ -z "$m_color" ]; then
             #    do_subfiles "$ml_IF"
             #fi
-            do_om "${ml_OF##*.}" # set om options based on output extension and m_color
+            do_om "$@" # set om options based on output extension and m_color
         fi
     fi
     
@@ -312,7 +312,7 @@ do_om () {
         om_flag="-m"
     fi
     
-    case "$1" in
+    case "${ml_OF##*.}" in
         [Oo][Bb][Jj] )
             if [ "$m_color" = "UV" ] || [ "$color_UV" = "true" ]; then
                 om="$om_flag vc vn fc wt" # colored texture
@@ -351,11 +351,19 @@ mlx_begin() {
 
     echo "<!DOCTYPE FilterScript>
 <FilterScript>" > "$ml_SF"
-    case "${ml_IF##*.}" in # check file extension of input
-        [Ss][Tt][Ll] )
-            mlx_merge_V # Same as "Unify Duplicated Vertices" in MeshLab stl import
-            ;;
-    esac
+    
+    if [ -z "$ml_IF" ]; then
+        # If input file is blank, create a dummy input file then delete it as the first step
+        echo "0 0 0" > TEMP3DP.xyz
+        ml_IF="TEMP3DP.xyz"
+        mlx_del_layer
+    else
+        case "${ml_IF##*.}" in # check file extension of input
+            [Ss][Tt][Ll] )
+                mlx_merge_V # Same as "Unify Duplicated Vertices" in MeshLab stl import
+                ;;
+        esac
+    fi
 }
 
 mlx_end() {
@@ -363,7 +371,6 @@ mlx_end() {
 }
 
 #example usage
-#    ml_SF="TEMP3DP_filter_script.mlx"
 #    mlx_begin
 #    mlx_scale scale=.5
 #    mlx_end
@@ -1028,6 +1035,45 @@ mlx_del_zero_area_F() {
     echo "    <filter name=\"Remove Zero Area Faces\"/>" >> "$ml_SF"
 }
 
+# TODO: set min & max better
+mlx_sel_V_quality() {
+    # Options & Defaults
+    local minQ=0 # Minimum acceptable quality value
+    local maxQ=0.05 # Maximum acceptable quality value
+    local inclusive="true" # If true only the faces with all the vertices within the specified range are selected. Otherwise any face with at least one vertex within the range is selected.
+    
+    # Other
+    local i
+    
+    for i in "$@"; do
+        case $i in
+            min[qQ]=*)
+                minQ="${i#*=}"
+                shift # past argument=value
+                ;;
+            max[qQ]=*)
+                maxQ="${i#*=}"
+                shift # past argument=value
+                ;;
+            inclusive=*)
+                inclusive="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
+    done
+    
+    echo "\
+    <filter name=\"Select by Vertex Quality\">
+        <Param name=\"minQ\" description=\"Min Quality\" value=\"$minQ\" min=\"0\" max=\"0.0888322\" type=\"RichDynamicFloat\" tooltip=\"Minimum acceptable quality value\"/>
+        <Param name=\"maxQ\" description=\"Max Quality\" value=\"$maxQ\" min=\"0\" max=\"0.0888322\" type=\"RichDynamicFloat\" tooltip=\"Maximum acceptable quality value\"/>
+        <Param name=\"Inclusive\" description=\"Inclusive Sel.\" value=\"$inclusive\" type=\"RichBool\" tooltip=\"If true only the faces with &lt;b>all&lt;/b> the vertices within the specified range are selected. Otherwise any face with at least one vertex within the range is selected.\"/>
+    </filter>" >> "$ml_SF"
+}
+
+
 ### End Selection & Deletion ###
 
 
@@ -1090,7 +1136,7 @@ mlx_translate() {
     </filter>" >> "$ml_SF"
 }
 
-# TODO: add center of mass as a center point option for rotate and scale
+# TODO: add center of mass & barycenter as a center point option for rotate and scale. Or just pass this as a customCenter
 
 # Usage: axis=angle axis=angle ...
 # NOTE: additional axis=angle pairs will stack and will be applied in the order listed
@@ -1533,6 +1579,7 @@ mlx_offset() {
 # Usage: iterations=(1)
 mlx_subdivide() {
     # Options & Defaults
+    local method="loop" # Method to use; currently only Loop is implemented but others may be added later
     local iterations=1 # Number of times the model is subdivided.
     local loopWeight=0 # Change the weighting scheme used; optimize some behaviors in spite of others. Values: loop(0), enhanceRegularity(1), enhanceContinuity(2)
     local E_threshold=0 # Edge threshold: all the edges longer than this threshold will be refined. Setting this value to zero will force an uniform refinement.
@@ -1590,6 +1637,7 @@ mlx_subdivide() {
 # Usage: iterations=(1)
 mlx_smooth() {
     # Options & Defaults
+    local method="laplacian" # Method to use; currently only Laplacian is implemented but others (Taubin, etc.) may be added later
     local iterations=1 # The number of times that the whole algorithm (normal smoothing + vertex fitting) is iterated.
     local boundary="true" # If true the boundary edges are smoothed only by themselves (e.g. the polyline forming the boundary of the mesh is independently smoothed). Can reduce the shrinking on the border but can have strange effects on very small boundaries.
     local cotangentWeight="true" # Cotangent weighting: if true the cotangent weighting scheme is computed for the averaging of the position. Otherwise (false) the simpler umbrella scheme (1 if the edge is present) is used.
@@ -1838,6 +1886,7 @@ mlx_cube() {
     local sizeY=1
     local sizeZ=1
     local center="false"
+    local color="" # specify a color name to apply vertex colors to the newly created mesh
     
     # Other
     local i
@@ -1872,6 +1921,10 @@ mlx_cube() {
                 center="${i#*=}"
                 shift # past argument=value
                 ;;
+            color=*)
+                color="${i#*=}"
+                shift # past argument=value
+                ;;
             *)
                 # unknown option
                 ;;
@@ -1881,6 +1934,9 @@ mlx_cube() {
     mlx_scale x="$sizeX" y="$sizeY" z="$sizeZ"
     if [ "$center" != "true" ]; then # center=false
         mlx_translate x=$(bc <<< "scale=10;($sizeX/2)") y=$(bc <<< "scale=10;($sizeY/2)") z=$(bc <<< "scale=10;($sizeZ/2)") 
+    fi
+    if [ -n "$color" ]; then
+        mlx_color_V color="$color"
     fi
 }
 
@@ -1901,6 +1957,7 @@ mlx_cylinder() {
     local radius1=1 # radius of the cone on bottom end
     local radius2=1 # radius of the cone on top end
     local center="false" # If true will center the height of the cone/cylinder around the origin. Default is false, placing the base of the cylinder or r1 radius of cone at the origin.
+    local color="" # specify a color name to apply vertex colors to the newly created mesh
     
     # Other
     local i
@@ -1947,6 +2004,10 @@ mlx_cylinder() {
                 fn="${i#*=}"
                 shift # past argument=value
                 ;;
+            color=*)
+                color="${i#*=}"
+                shift # past argument=value
+                ;;
             *)
                 # unknown option
                 ;;
@@ -1967,6 +2028,9 @@ mlx_cylinder() {
     if [ "$m_up" = "Z" ]; then
         mlx_rotate x=90 # rotate to Z up
     fi
+    if [ -n "$color" ]; then
+        mlx_color_V color="$color"
+    fi
 }
 
 # Usage: radius=(1) subdiv=(3)
@@ -1974,6 +2038,7 @@ mlx_sphere() {
     # Options & Defaults
     local radius=1
     local subdiv=3 # Subdivision level; Number of the recursive subdivision of the surface. Default is 3 (a sphere approximation composed by 1280 faces). Admitted values are in the range 0 (an icosahedron) to 8 (a 1.3 MegaTris approximation of a sphere). Formula for number of faces: F=20*4^subdiv
+    local color="" # specify a color name to apply vertex colors to the newly created mesh
     
     # Other
     local i
@@ -1988,6 +2053,10 @@ mlx_sphere() {
                 subdiv="${i#*=}"
                 shift # past argument=value
                 ;;
+            color=*)
+                color="${i#*=}"
+                shift # past argument=value
+                ;;
             *)
                 # unknown option
                 ;;
@@ -1999,6 +2068,9 @@ mlx_sphere() {
         <Param name=\"radius\" description=\"Radius\" value=\"$radius\" type=\"RichFloat\" tooltip=\"Radius of the sphere\"/>
         <Param name=\"subdiv\" description=\"Subdiv. Level\" value=\"$subdiv\" type=\"RichInt\" tooltip=\"Number of the recursive subdivision of the surface. Default is 3 (a sphere approximation composed by 1280 faces).&lt;br>Admitted values are in the range 0 (an icosahedron) to 8 (a 1.3 MegaTris approximation of a sphere)\"/>
     </filter>" >> "$ml_SF"
+    if [ -n "$color" ]; then
+        mlx_color_V color="$color"
+    fi
 }
 
 # Usage: angle=(60) subdiv=(3)
@@ -2006,6 +2078,7 @@ mlx_sphere_cap() {
     # Options & Defaults
     local angle=60 # Angle of the cone subtending the cap. It must be <180
     local subdiv=3 # Subdivision level; Number of the recursive subdivision of the surface. Default is 3 (a sphere approximation composed by 1280 faces). Admitted values are in the range 0 (an icosahedron) to 8 (a 1.3 MegaTris approximation of a sphere). Formula for number of faces: F=20*4^subdiv
+    local color="" # specify a color name to apply vertex colors to the newly created mesh
     
     # Other
     local i
@@ -2020,6 +2093,10 @@ mlx_sphere_cap() {
                 subdiv="${i#*=}"
                 shift # past argument=value
                 ;;
+            color=*)
+                color="${i#*=}"
+                shift # past argument=value
+                ;;
             *)
                 # unknown option
                 ;;
@@ -2031,6 +2108,9 @@ mlx_sphere_cap() {
         <Param name=\"angle\" description=\"Angle\" value=\"$angle\" type=\"RichFloat\" tooltip=\"Angle of the cone subtending the cap. It must be &lt; 180\"/>
         <Param name=\"subdiv\" description=\"Subdiv. Level\" value=\"$subdiv\" type=\"RichInt\" tooltip=\"Number of the recursive subdivision of the surface. Default is 3 (a sphere approximation composed by 1280 faces).&lt;br>Admitted values are in the range 0 (an icosahedron) to 8 (a 1.3 MegaTris approximation of a sphere)\"/>
     </filter>" >> "$ml_SF"
+    if [ -n "$color" ]; then
+        mlx_color_V color="$color"
+    fi
 }
 
 # Usage: (radius_h= radius_v= )|(ID= OD= ) fn_h= fn_v=
@@ -2042,6 +2122,7 @@ mlx_torus() {
     local OD # Alt; outer diameter of torus, OD=2*(radius_h+radius_v)
     local fn_h=24 # Subdivision step of the ring
     local fn_v=12 # Number of sides of the polygonal approximation of the torus section
+    local color="" # specify a color name to apply vertex colors to the newly created mesh
     
     # Other
     local i
@@ -2090,6 +2171,10 @@ mlx_torus() {
                 fn_v="${i#*=}"
                 shift # past argument=value
                 ;;
+            color=*)
+                color="${i#*=}"
+                shift # past argument=value
+                ;;
             *)
                 # unknown option
                 ;;
@@ -2103,6 +2188,9 @@ mlx_torus() {
         <Param name=\"hSubdiv\" description=\"Horizontal Subdivision\" value=\"$fn_h\" type=\"RichInt\" tooltip=\"Subdivision step of the ring\"/>
         <Param name=\"vSubdiv\" description=\"Vertical Subdivision\" value=\"$fn_v\" type=\"RichInt\" tooltip=\"Number of sides of the polygonal approximation of the torus section\"/>
     </filter>" >> "$ml_SF"
+    if [ -n "$color" ]; then
+        mlx_color_V color="$color"
+    fi
 }
 
 # Usage: size=(1)|(X=(1) Y=(1)) center=(false)
@@ -2114,6 +2202,7 @@ mlx_square() { # 2D
     local num_V_X=2 # Number of vertices in the X direction. Must be at least 2 (start and end vertices); setting this to a higher value will create an evenly spaced grid.
     local num_V_Y=2 # Number of vertices in the Y direction. Must be at least 2 (start and end vertices); setting this to a higher value will create an evenly spaced grid.
     local center="false" # If true square will be centered on origin; otherwise it is place in the positive XY quadrant. Note that the "center" parameter in the mlx script does not actually center the square, not sure what it is doing. Instead this is set to false, which places the plane in the -X,+Y quadrant, and it is translated to the appropriate position after creation.
+    local color="" # specify a color name to apply vertex colors to the newly created mesh
     
     # Other
     local i
@@ -2137,6 +2226,10 @@ mlx_square() { # 2D
                 center="${i#*=}"
                 shift # past argument=value
                 ;;
+            color=*)
+                color="${i#*=}"
+                shift # past argument=value
+                ;;
             *)
                 # unknown option
                 ;;
@@ -2157,6 +2250,9 @@ mlx_square() { # 2D
     else
         mlx_translate x="$sizeX"
     fi
+    if [ -n "$color" ]; then
+        mlx_color_V color="$color"
+    fi
 }
 
 # Usage: (radius=(1)|(radius1=(1) radius2=(0)))|(diameter=(2)|(diameter1=(2) diameter2=(0)))
@@ -2165,7 +2261,8 @@ mlx_circle() { #2D
     # Options & Defaults
     local radius1=1 # Outer radius of the circle
     local radius2=0 # Inner radius of the circle (if non-zero it creates an annulus)
-    local color="" # specify a color name to apply vertex olors to the newly created mesh
+    local color="" # specify a color name to apply vertex colors to the newly created mesh
+    
     # Other
     local i
     
@@ -2214,7 +2311,7 @@ mlx_circle() { #2D
     </filter>" >> "$ml_SF"
     if [ -n "$color" ]; then
         mlx_color_V color="$color"
-    fi    
+    fi
 }
 
 ### End Create ###
@@ -2301,8 +2398,9 @@ mlx_hausdorff_distance() {
     </filter>" >> "$ml_SF"
 }
 
-mlx_sampling_pd() { # Poisson-disk Sampling
+mlx_sampling() {
     # Options & Defaults
+    local method="poisson_disk" # Method to use; currently only Poisson-disk is implemented but others (Montecarlo, etc.) may be added later
     local sample_num=1000 # The desired number of samples. The ray of the disk is calculated according to the sampling density.
     local radius=0 # If not zero this parameter override the previous parameter to allow exact radius specification, max=BBdiag
     local montecarloRate=20 # The over-sampling rate that is used to generate the intial Montecarlo samples (e.g. if this parameter is &lt;i>K&lt;/i> means that&lt;i>K&lt;/i> x &lt;i>poisson sample&lt;/i> points will be used). The generated Poisson-disk samples are a subset of these initial Montecarlo samples. Larger this number slows the process but make it a bit more accurate.
@@ -2449,6 +2547,43 @@ mlx_color_V() {
         <Param name=\"y\" description=\"func g = \" value=\"$g\" type=\"RichString\" tooltip=\"function to generate Green component. Expected Range 0-255\"/>
         <Param name=\"z\" description=\"func b = \" value=\"$b\" type=\"RichString\" tooltip=\"function to generate Blue component. Expected Range 0-255\"/>
         <Param name=\"a\" description=\"func alpha = \" value=\"$a\" type=\"RichString\" tooltip=\"function to generate Alpha component. Expected Range 0-255\"/>
+    </filter>" >> "$ml_SF"
+}
+
+mlx_voronoi_V_color() {
+    # Options & Defaults
+    local target=0 # The mesh whose surface is colored. For each vertex of this mesh we decide the color according the below parameters.
+    local source=1 # The mesh whose vertexes are used as seed points for the color computation. These seeds point are projected onto the target mesh.
+    local backward="true" # If true the mesh is colored according the distance from the frontier of the voronoi diagram induced by the source mesh seeds.
+    
+    # Other
+    local i
+    
+    for i in "$@"; do
+        case $i in
+            target=*)
+                target="${i#*=}"
+                shift # past argument=value
+                ;;
+            source=*)
+                source="${i#*=}"
+                shift # past argument=value
+                ;;
+            backward=*)
+                b="${i#*=}"
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
+    done
+    
+    echo "\
+    <filter name=\"Voronoi Vertex Coloring\">
+        <Param name=\"ColoredMesh\" description=\"To be Colored Mesh\" value=\"$target\" type=\"RichMesh\" tooltip=\"The mesh whose surface is colored. For each vertex of this mesh we decide the color according the below parameters.\"/>
+        <Param name=\"VertexMesh\" description=\"Vertex Mesh\" value=\"$source\" type=\"RichMesh\" tooltip=\"The mesh whose vertexes are used as seed points for the color computation. These seeds point are projected onto the above mesh.\"/>
+        <Param name=\"backward\" description=\"BackDistance\" value=\"$backward\" type=\"RichBool\" tooltip=\"If true the mesh is colored according the distance from the frontier of the voronoi diagram induced by the VertexMesh seeds.\"/>
     </filter>" >> "$ml_SF"
 }
 
