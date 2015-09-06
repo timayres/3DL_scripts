@@ -789,7 +789,7 @@ do_platform_FFF() {
     #do_metadata "$1"
     #m_color="NC"
     
-    platform_IF="$1"
+    platform_IF="$do_2stl_OF"
     platform_OF="${fpref}_platform${meta}.stl"
     
     offset=0.001 # small offset from bottom; this amount will overlap between platform & model
@@ -838,3 +838,77 @@ do_platform_FFF() {
     return $return_code
 }
 
+do_scad_template() { 
+    local return_code
+    
+    # make an stl version for OpenSCAD processing
+    do_2stl "$1" #this will also run do_metadata, set m_color=NC & perform an admesh check
+    #do_metadata "$1"
+    #m_color="NC"
+    
+    #half_bust_FFF_IF="$do_2stl_OF"
+    scad_template_IF="$do_2stl_OF"
+    #scad_template_OF="${fpref}_half_bust_FFF_neg_vol${meta}.stl"
+    
+    ###Measure mesh
+    do_measure_geometry "$scad_template_IF"
+    
+    # if [ $(bc <<< "$zmin > 0") -eq 1 ]; then # equals 1 if true, 0 if false
+        # echo "zmin must be negative, i.e. the bottom of the mesh must be below z=0. Exiting..."
+        # exit 1
+    # fi
+    ###/Measure mesh
+    
+    # magnet_z_pos=0.2 #magnet z position, in % up from bottom
+    # magnet_z_pos=$(bc <<< "scale=10;($magnet_z_pos*$zmax)")
+    # thickness=3 # thickness of hanger hole
+    
+    scad_template_scad_OF="${fpref}-working${meta}.scad" # set scad file name
+    #scad_template_scad_IF="${scriptpath}/../scad/scad_template.scad"
+    
+            echo "\
+//do_half_bust_FFF function
+
+//variables set via calling script
+
+model_stl=\"$scad_template_IF\";
+
+//AABB measurements
+BBminX=$xmin;
+BBmaxX=$xmax;
+BBminY=$ymin;
+BBmaxY=$ymax;
+BBminZ=$zmin;
+BBmaxZ=$zmax;
+BBcenterX=$xcenter;
+BBcenterY=$ycenter;
+BBcenterZ=$zcenter;
+BBsizeX=$xsize;
+BBsizeY=$ysize;
+BBsizeZ=$zsize;
+BBdiag=$BBdiag;
+
+//Geometry measurements
+CMX=${center_of_mass[0]}; // center of mass X component
+CMY=${center_of_mass[1]}; // center of mass Y component
+CMZ=${center_of_mass[2]}; // center of mass Z component
+BCX=${barycenter[0]}; // thin shell barycenter X component
+BCY=${barycenter[1]}; // thin shell barycenter X component
+BCZ=${barycenter[2]}; // thin shell barycenter X component
+
+//thickness=$thickness;
+//magnet_z_pos=$magnet_z_pos;
+
+/**********CUT LINE**********/
+// Everything above this line will be replaced by calling script
+" > "$scad_template_scad_OF"
+    
+    # line_no=$(grep -n -m1 "CUT LINE" "$scad_template_scad_IF" | cut -d":" -f1)
+    # tail -n +$line_no "$scad_template_scad_IF" >> "$scad_template_scad_OF"
+
+    # run_openscad "$scad_template_scad_OF" "$scad_template_OF" 
+    # return_code=$?
+
+    # return_file="$scad_template_OF"
+    # return $return_code
+}

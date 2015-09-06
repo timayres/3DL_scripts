@@ -221,6 +221,18 @@ do_subfiles () {
         [Ss][Tt][Ll] )
             texture_files=()
             ;;
+        [wW][rR[lL] ) # VRML V2.0 NOT TESTED
+            # Texture Format: texture ImageTexture { url "model_texture.jpg" }
+            OIFS="$IFS"; IFS=$'\n'; texture_files=( $(grep "ImageTexture" "$1" | cut -d"\"" -f2) ); IFS="$OIFS"
+            OIFS="$IFS"; IFS=$'\n'; texture_files_unique=( $(sort -u <<< "${texture_files[*]}") ); IFS="$OIFS"
+            if [ "$verbosity" -ge 2 ]; then
+                echo
+                echo "Number of texture file(s): " ${#texture_files[@]}
+                echo "Number of unique texture file(s): " ${#texture_files_unique[@]}
+                echo "Texture file(s): " ${texture_files[@]}
+                echo "Unique Texture file(s): " ${texture_files_unique[@]}
+            fi
+            ;;
         [Xx]3[Dd] )
             # Texture Format: <ImageTexture url="model_texture.jpg"/>
             OIFS="$IFS"; IFS=$'\n'; texture_files=( $(grep "ImageTexture" "$1" | cut -d"\"" -f2) ); IFS="$OIFS"
@@ -247,9 +259,9 @@ do_subfiles () {
                 echo "Unique Texture file(s): " ${texture_files_unique[@]}
             fi
             ;;
-        [pP][lL][yY] ) # Need to convert to ascii before reading? Maybe not! Header is in ascii
+        [pP][lL][yY] ) # Can read binary files too; the header is in ascii
             # Texture Format: comment TextureFile model_texture.jpg
-            # Is this unique to MeshLab? How does other software identify where the texture file is?
+            # This works for MeshLab & itSeez3D, but may not work for every ply file. Can't get textured models to work in blender yet.
             OIFS="$IFS"; IFS=$'\n'; texture_files=( $(grep -a "TextureFile" "$1" | cut -d" " -f3) ); IFS="$OIFS"
             OIFS="$IFS"; IFS=$'\n'; texture_files_unique=( $(sort -u <<< "${texture_files[*]}") ); IFS="$OIFS"
             if [ "$verbosity" -ge 2 ]; then

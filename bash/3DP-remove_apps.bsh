@@ -22,6 +22,7 @@ center
 center_x
 half_bust_FFF
 platform_FFF
+scad_template
 "
 
 scriptpath="$(cd "$(dirname "$0")"; pwd -P)"

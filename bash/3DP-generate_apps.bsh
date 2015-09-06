@@ -10,7 +10,9 @@ cd "$scriptpath"
 . ./mlx.bsh
 
 # compile c programs
-gcc -Wall ../c/polylinesort.c -o ../c/polylinesort
+if [ ! -x polylinesort ] || [ ! -x polylinesort.exe ]; then
+    gcc -Wall ../c/polylinesort.c -o ../c/polylinesort
+fi
 
 gen_mlx_scratch_shortcuts="true"
 
@@ -28,6 +30,7 @@ rename
 hollow
 half_bust_FFF
 platform_FFF
+scad_template
 "
 #center_x
 
@@ -43,6 +46,7 @@ rename
 hollow
 half_bust_FFF
 platform_FFF
+scad_template
 "
 
 gen_bash() { #generate bash scripts for each main app
