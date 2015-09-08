@@ -355,6 +355,7 @@ do_om () {
     return 0
 }
 
+# ml_IF must be set before calling this
 mlx_begin() {
     if [ -z "$ml_SF" ]; then
         ml_SF="TEMP3DP_default.mlx" # set a default script filename if none is already set
@@ -362,7 +363,6 @@ mlx_begin() {
 
     echo "<!DOCTYPE FilterScript>
 <FilterScript>" > "$ml_SF"
-    
     if [ -z "$ml_IF" ]; then
         # If input file is blank, create a dummy input file then delete it as the first step
         echo "0 0 0" > TEMP3DP.xyz
@@ -987,7 +987,7 @@ mlx_sel_small_parts() {
     for i in "$@"; do
         case $i in
             [rR]=*|ratio=*)
-                ratio="${i#*=}"
+                ratio="${i#*=}" # $(bc <<< "0.01 * ${i#*=}")
                 shift # past argument=value
                 ;;
             [nN]on[cC]losed[oO]nly=*)
@@ -1817,19 +1817,19 @@ mlx_del_layer() {
     echo "    <filter name=\"Delete Current Mesh\"/>" >> "$ml_SF"
 }
 
-# Usage: layer=name
-# renames current layer
+# Usage: label=name
+# renames current layer label
 mlx_rename_layer() {
     # Options & Defaults
-    local layer
+    local label
     
     # Other
     local i
     
     for i in "$@"; do
         case $i in
-            l=*|layer=*)
-                layer="${i#*=}"
+            l=*|label=*)
+                label="${i#*=}"
                 shift # past argument=value
                 ;;
             *)
@@ -1840,24 +1840,22 @@ mlx_rename_layer() {
     
     echo "\
     <filter name=\"Rename Current Mesh\">
-        <Param name=\"newName\" description=\"New Label\" value=\"$layer\" type=\"RichString\" tooltip=\"New Label for the mesh\"/>
+        <Param name=\"newName\" description=\"New Label\" value=\"$label\" type=\"RichString\" tooltip=\"New Label for the mesh\"/>
     </filter>" >> "$ml_SF"
 }
 
-# Usage: layer=name
-# NEED TO TEST
-# Note" default value was "0"; does this need to be the name (label?) of the layer or its number in the stack?
+# Usage: layerNum=
 mlx_change_layer() {
     # Options & Defaults
-    local layer=0 #First (base) layer, usually the first input file unless its been deleted.
+    local layerNum=0 #First (base) layer, usually the first input file unless its been deleted.
     
     # Other
     local i
     
     for i in "$@"; do
         case $i in
-            l=*|layer=*)
-                layer="${i#*=}"
+            l=*|layer[nN]um=*)
+                layerNum="${i#*=}"
                 shift # past argument=value
                 ;;
             *)
@@ -1868,7 +1866,7 @@ mlx_change_layer() {
     
     echo "\
     <filter name=\"Change the current layer\">
-        <Param name=\"mesh\" description=\"Mesh\" value=\"$layer\" type=\"RichMesh\" tooltip=\"The name of the current mesh\"/>
+        <Param name=\"mesh\" description=\"Mesh\" value=\"$layerNum\" type=\"RichMesh\" tooltip=\"The name of the current mesh\"/>
     </filter>" >> "$ml_SF"
 }
 
@@ -2339,8 +2337,9 @@ mlx_hausdorff_distance() {
     local sample_E="true" # See the above comment.
     local sample_fauxE="false" # See the above comment.
     local sample_F="true" # See the above comment.
-    local sample_num=4 # The desired number of samples. It can be smaller or larger than the mesh size, and according to the chosen sampling strategy it will try to adapt.
-    local maxdist=1 # Sample points for which we do not find anything within this distance are rejected and not considered neither for averaging nor for max. default: 5% BBdiag of sampled mesh, max 100% BBdiag of sampled mesh
+    local sample_num=1000 # The desired number of samples. It can be smaller or larger than the mesh size, and according to the chosen sampling strategy it will try to adapt. Default is number of verticies in sampled mesh
+    local maxdist=10 # Sample points for which we do not find anything within this distance are rejected and not considered neither for averaging nor for max. ML default: 5% BBdiag of sampled mesh, max 100% BBdiag of sampled mesh
+    local maxdist_perc=5 # max distance as a percentage of the BBdiag of sampled mesh
     
     # Other
     local i
@@ -2387,6 +2386,14 @@ mlx_hausdorff_distance() {
                 ;;
             maxdist=*)
                 maxdist="${i#*=}"
+                shift # past argument=value
+                ;;
+            maxdist[pP]erc=*)
+                if [ -n "$BBdiag" ]; then
+                    maxdist=$(bc <<< "0.01 * ${i#*=} * $BBdiag") # $(bc <<< "0.01 * ${i#*=}")
+                else
+                    echo "WARNING: BB diagonal was not found, using default max distance instead. Run do_measure_size first to find BB diag."
+                fi
                 shift # past argument=value
                 ;;
             *)
