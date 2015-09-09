@@ -1,12 +1,12 @@
 #!/bin/bash
-#license: LGPLv2.1
-# 3DP-generate_windows_scripts.bsh
-# generate windows & cygwin scripts
+# remove_apps.bsh
+# license: LGPLv2.1
+# removed generated app scripts & shortcuts
 
-#set -x
+scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
+cd "$scriptpath"
 
 apps="
-2x3dz
 2daez
 2objz
 2stl
@@ -17,25 +17,37 @@ simplify
 scale
 swapYZ
 rename
+"
+
+modeling_apps="
 hollow
-center
-center_x
 half_bust_FFF
 platform_FFF
 scad_template
 "
 
-scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
-
-cd "$scriptpath"
-
 for a in $apps ; do
-    subscript="3DP-$a"
-    
-    rm "${subscript}.bsh"
-    rm "../${subscript}.cmd"
-    rm "../${subscript}.desktop"
+    app_name="3DL-$a"
+    rm "${app_name}.bsh"
+    if [[ $(uname -s) == CYGWIN* ]]; then
+        rm "../apps/${app_name}.cmd"
+    elif [[ $(uname -s) == Linux* ]]; then
+        rm "../apps/${app_name}.desktop"
+    fi
 done
 
-rm "../mlx_scratch.cmd"
-rm "../mlx_scratch.desktop"
+for a in $modeling_apps ; do
+    app_name="3DL-$a"
+    rm "${app_name}.bsh"
+    if [[ $(uname -s) == CYGWIN* ]]; then
+        rm "../apps/modeling/${app_name}.cmd"
+    elif [[ $(uname -s) == Linux* ]]; then
+        rm "../apps/modeling/${app_name}.desktop"
+    fi
+done
+
+if [[ $(uname -s) == CYGWIN* ]]; then
+    rm "../apps/mlx_scratch.cmd"
+elif [[ $(uname -s) == Linux* ]]; then
+    rm "../apps/mlx_scratch.desktop"
+fi
