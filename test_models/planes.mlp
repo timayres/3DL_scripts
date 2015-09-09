@@ -1,0 +1,38 @@
+<!DOCTYPE MeshLabDocument>
+<MeshLabProject>
+ <MeshGroup>
+  <MLMesh label="XY (Z) Plane" filename="PLANE.obj">
+   <MLMatrix44>
+1 0 0 0 
+0 1 0 0 
+0 0 1 0 
+0 0 0 1 
+</MLMatrix44>
+  </MLMesh>
+  <MLMesh label="YZ (X) Plane" filename="PLANE.obj">
+   <MLMatrix44>
+-4.37114e-08 0 1 0 
+0 1 0 0 
+-1 0 -4.37114e-08 0 
+0 0 0 1 
+</MLMatrix44>
+  </MLMesh>
+  <MLMesh label="XZ (Y) Plane" filename="PLANE.obj">
+   <MLMatrix44>
+1 0 0 0 
+0 -4.37114e-08 1 0 
+0 -1 -4.37114e-08 0 
+0 0 0 1 
+</MLMatrix44>
+  </MLMesh>
+  <MLMesh label="XY 10d Plane" filename="PLANE.obj">
+   <MLMatrix44>
+1 0 0 0 
+0 0.984808 -0.173648 0 
+0 0.173648 0.984808 0 
+0 0 0 1 
+</MLMatrix44>
+  </MLMesh>
+ </MeshGroup>
+ <RasterGroup/>
+</MeshLabProject>
