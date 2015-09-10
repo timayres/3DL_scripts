@@ -6,6 +6,8 @@
 
 ##Set program locations, ML_VERSION, aliases##
 if [[ $(uname -s) == CYGWIN* ]]; then
+    _CYGBIN="C:\cygwin64\bin" # Cygwin bin directory location
+    
     ML_VERSION="1.3.4BETA" # MeshLab version, 1.3.3 or 1.3.4BETA or SVN
     
 	# Set paths for dependencies
@@ -41,6 +43,11 @@ fi
 # 1-delete small parts to get largest volume; save
 # 2-select small parts, invert sel & del largest part. Go to 1.
 
+if [ -z "${scriptpath}" ]; then
+    scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
+fi
+
+. ${scriptpath}/measure.bsh
 
 ###Initialize variables for run_meshlab
 ml_IF="" #input filename
@@ -54,6 +61,7 @@ run_meshlab() {
     # ml_OF
     # ml_SF (run mlx script, not needed e.g. just to convert formats)
     # ml_LF (save a log file, mostly useful for cgm & ctm)
+    # om overwrite default om values
     # m_color (for do_om, only needed if ml_OF is not "empty")
     
     # TODO: add support for meshlab project files
@@ -159,7 +167,7 @@ run_admesh() {
     
     # set default log file if it is not already set
     if [ -z "$admesh_LF" ]; then
-        admesh_LF="TEMP3DP_admeshlog.txt"
+        admesh_LF="TEMP3DL_admeshlog.txt"
     fi
     
     # check for output file
@@ -352,21 +360,39 @@ do_om () {
             exit 1
             ;;
     esac
+    
+    for i in "$@"; do # TODO: need to test!
+        case $i in
+            +*) # add om option
+                om="${om} ${i#*+}"
+                axis=0 # X axis
+                offset="${i#*=}"
+                shift # past argument=value
+                ;;
+            -*) # remove om option
+                om=${om/??${i#*-}/}
+                shift # past argument=value
+                ;;
+            *)
+                # unknown option
+                ;;
+        esac
+    done
     return 0
 }
 
 # ml_IF must be set before calling this
 mlx_begin() {
     if [ -z "$ml_SF" ]; then
-        ml_SF="TEMP3DP_default.mlx" # set a default script filename if none is already set
+        ml_SF="TEMP3DL_default.mlx" # set a default script filename if none is already set
     fi
 
     echo "<!DOCTYPE FilterScript>
 <FilterScript>" > "$ml_SF"
     if [ -z "$ml_IF" ]; then
         # If input file is blank, create a dummy input file then delete it as the first step
-        echo "0 0 0" > TEMP3DP.xyz
-        ml_IF="TEMP3DP.xyz"
+        echo "0 0 0" > TEMP3DL.xyz
+        ml_IF="TEMP3DL.xyz"
         mlx_del_layer
     else
         case "${ml_IF##*.}" in # check file extension of input
@@ -412,49 +438,42 @@ parse_geometry_log() {
     area_mm2=$(grep -m1 "Mesh Surface" "$1" | tr -s " " | cut -d" " -f4)
     area_cm2=$(bc <<< "scale=10;($area_mm2 * 0.01)")
     
-    total_edge_length=$(grep -m1 "Mesh Total Len of" "$1" | tr -s " " | cut -d" " -f8) # not including faux edges, select -m2 for those
+    total_E_length=$(grep -m1 "Mesh Total Len of" "$1" | tr -s " " | cut -d" " -f8)
+    
+    total_fauxE_length=$(grep -m2 "Mesh Total Len of" "$1" | tr -s " " | cut -d" " -f8)
     
     barycenter=( $(grep -m1 "Thin shell barycenter" "$1" | tr -s " " | cut -d" " -f4-6) )
     
     center_of_mass=( $(grep -m1 "Center of Mass" "$1" | tr -s " " | cut -d" " -f5-7) )
     
-    # TODO: can I replace the line_no assignments below with inline calls?
     line_no=$(grep -n -m1 "Inertia Tensor" "$1" | cut -d":" -f1)
-    line_no=$(($line_no+1))
-    inertia_tensor_R0C=( $(awk NR==$line_no "$1" | tr -s " " | cut -d" " -f3-5) )
-    line_no=$(($line_no+1))
-    inertia_tensor_R1C=( $(awk NR==$line_no "$1" | tr -s " " | cut -d" " -f3-5) )
-    line_no=$(($line_no+1))
-    inertia_tensor_R2C=( $(awk NR==$line_no "$1" | tr -s " " | cut -d" " -f3-5) )
+    inertia_tensor_R0C=( $(awk NR==$((line_no+1)) "$1" | tr -s " " | cut -d" " -f3-5) )
+    inertia_tensor_R1C=( $(awk NR==$((line_no+2)) "$1" | tr -s " " | cut -d" " -f3-5) )
+    inertia_tensor_R2C=( $(awk NR==$((line_no+3)) "$1" | tr -s " " | cut -d" " -f3-5) )
     
     line_no=$(grep -n -m1 "Principal axes" "$1" | cut -d":" -f1)
-    line_no=$(($line_no+1))
-    principal_axes_R0C=( $(awk NR==$line_no "$1" | tr -s " " | cut -d" " -f3-5) )
-    line_no=$(($line_no+1))
-    principal_axes_R1C=( $(awk NR==$line_no "$1" | tr -s " " | cut -d" " -f3-5) )
-    line_no=$(($line_no+1))
-    principal_axes_R2C=( $(awk NR==$line_no "$1" | tr -s " " | cut -d" " -f3-5) )
+    principal_axes_R0C=( $(awk NR==$((line_no+1)) "$1" | tr -s " " | cut -d" " -f3-5) )
+    principal_axes_R1C=( $(awk NR==$((line_no+2)) "$1" | tr -s " " | cut -d" " -f3-5) )
+    principal_axes_R2C=( $(awk NR==$((line_no+3)) "$1" | tr -s " " | cut -d" " -f3-5) )
     
     line_no=$(grep -n -m1 "axis momenta" "$1" | cut -d":" -f1)
-    line_no=$(($line_no+1))
-    axis_momenta=( $(awk NR==$line_no "$1" | tr -s " " | cut -d" " -f3-5) )
+    axis_momenta=( $(awk NR==$((line_no+1)) "$1" | tr -s " " | cut -d" " -f3-5) )
     
     if [ "$verbosity" -ge 2 ]; then
-        echo ; echo "***Parsed Geometry Values***"
-        echo -n "  Volume (cm^3): "; printf "%.2f\n" "$volume_cm3"
-        #echo -n "  Surface Area (mm^2): "; printf "%.2f\n" "$area_mm2"
-        echo -n "  Surface Area (cm^2): "; printf "%.2f\n" "$area_cm2"
-        echo -n "  Total Edge Length (mm): "; printf "%.2f\n" "$total_edge_length"
-        echo -n "  Thin shell barycenter: "; printf "( %.2f %.2f %.2f )\n" ${barycenter[@]}
-        echo -n "  Center of Mass: "; printf "( %.2f %.2f %.2f )\n" ${center_of_mass[@]}
-        echo -n "  Inertia Tensor: "; printf "( %.2f %.2f %.2f )\n" ${inertia_tensor_R0C[@]}
-        echo -n "                  "; printf "( %.2f %.2f %.2f )\n" ${inertia_tensor_R1C[@]}
-        echo -n "                  "; printf "( %.2f %.2f %.2f )\n" ${inertia_tensor_R2C[@]}
-        echo -n "  Principal axes: "; printf "( %.2f %.2f %.2f )\n" ${principal_axes_R0C[@]}
-        echo -n "                  "; printf "( %.2f %.2f %.2f )\n" ${principal_axes_R1C[@]}
-        echo -n "                  "; printf "( %.2f %.2f %.2f )\n" ${principal_axes_R2C[@]}
-        echo -n "  Axis momenta: "; printf "( %.2f %.2f %.2f )\n" ${axis_momenta[@]}
-        echo "***Parsed Geometry Values***"
+        printf "\n***Parsed Geometry Values***\n"
+        printf "  Volume (cm^3): %.2f\n" "$volume_cm3"
+        printf "  Surface Area (cm^2): %.2f\n" "$area_cm2"
+        printf "  Total Edge Length (mm): %.2f\n" "$total_E_length"
+        printf "  Thin shell barycenter: ( %.2f %.2f %.2f )\n" ${barycenter[@]}
+        printf "  Center of Mass: ( %.2f %.2f %.2f )\n" ${center_of_mass[@]}
+        printf "  Inertia Tensor: ( %.2f %.2f %.2f )\n" ${inertia_tensor_R0C[@]}
+        printf "                  ( %.2f %.2f %.2f )\n" ${inertia_tensor_R1C[@]}
+        printf "                  ( %.2f %.2f %.2f )\n" ${inertia_tensor_R2C[@]}
+        printf "  Principal axes: ( %.2f %.2f %.2f )\n" ${principal_axes_R0C[@]}
+        printf "                  ( %.2f %.2f %.2f )\n" ${principal_axes_R1C[@]}
+        printf "                  ( %.2f %.2f %.2f )\n" ${principal_axes_R2C[@]}
+        printf "  Axis momenta: ( %.2f %.2f %.2f )\n" ${axis_momenta[@]}
+        printf "***Parsed Geometry Values***\n"
     fi
     return 0
 }
@@ -987,8 +1006,12 @@ mlx_sel_small_parts() {
     for i in "$@"; do
         case $i in
             [rR]=*|ratio=*)
-                ratio="${i#*=}" # $(bc <<< "0.01 * ${i#*=}")
+                ratio="${i#*=}"
                 shift # past argument=value
+                ;;
+            ratio[pP]erc=*) # provide ratio in percentage form, 1-100
+                ratio=$(bc <<< "0.01 * ${i#*=}")
+                shift #
                 ;;
             [nN]on[cC]losed[oO]nly=*)
                 NonClosedOnly="${i#*=}"
@@ -1432,7 +1455,7 @@ mlx_simplify() {
                 faces="${i#*=}"
                 shift # past argument=value
                 ;;
-            target[pP]erc=*)
+            target[pP]erc=*) # TODO: should this be 0-100 like other percentages?
                 targetPerc="${i#*=}"
                 shift # past argument=value
                 ;;
@@ -1520,9 +1543,9 @@ mlx_simplify() {
 }
 
 # Usage: voxel=(1) delta=(0)
-# If you prefer to use a precision (as a percentage of the BBdiag) instead of the voxel cell size include the following code in the parent and pass voxel:
-#   precision=1 # 1% of BBdiag
-#   voxel=$(bc <<< "($BBdiag * 0.01 * $precision)")
+# If you prefer to use a precision (as a percentage of AABB[diag]) instead of the voxel cell size include the following code in the parent and pass voxel:
+#   precision=1 # 1% of AABB[diag]
+#   voxel=$(bc <<< "(${AABB[diag]} * 0.01 * $precision)")
 mlx_offset() {
     # Options & Defaults
     local voxel=1 # Voxel cell size for resampling. Smaller cells give better precision at a higher computational cost. Remember that halving the cell size means that you build a volume 8 times larger.
@@ -1537,11 +1560,11 @@ mlx_offset() {
     local voxelMax="100"
     local deltaMin="-100"
     local deltaMax="100"
-    # BBdiag will be used to set maxes and mins if available
-    if [ -n "$BBdiag" ]; then
-        voxelMax="$BBdiag"
-        deltaMin=$(bc <<< "($BBdiag * 0.2 * -1)") #-20% of BBdiag
-        deltaMax=$(bc <<< "($BBdiag * 0.2)") #+20% of BBdiag
+    # AABB[diag] will be used to set maxes and mins if available
+    if [ -n "${AABB[diag]}" ]; then
+        voxelMax="${AABB[diag]}"
+        deltaMin=$(bc <<< "(${AABB[diag]} * 0.2 * -1)") #-20% of AABB[diag]
+        deltaMax=$(bc <<< "(${AABB[diag]} * 0.2)") #+20% of AABB[diag]
     fi
     
     for i in "$@"; do
@@ -2337,17 +2360,20 @@ mlx_hausdorff_distance() {
     local sample_E="true" # See the above comment.
     local sample_fauxE="false" # See the above comment.
     local sample_F="true" # See the above comment.
-    local sample_num=1000 # The desired number of samples. It can be smaller or larger than the mesh size, and according to the chosen sampling strategy it will try to adapt. Default is number of verticies in sampled mesh
-    local maxdist=10 # Sample points for which we do not find anything within this distance are rejected and not considered neither for averaging nor for max. ML default: 5% BBdiag of sampled mesh, max 100% BBdiag of sampled mesh
-    local maxdist_perc=5 # max distance as a percentage of the BBdiag of sampled mesh
+    local sample_num=1000 # The desired number of samples. It can be smaller or larger than the mesh size, and according to the chosen sampling strategy it will try to adapt. ML default: number of vertices in sampled mesh
+    local maxdist=10 # Sample points for which we do not find anything within this distance are rejected and not considered neither for averaging nor for max. ML default: 5% AABB[diag] of sampled mesh, max 100% AABB[diag] of sampled mesh
     
     # Other
     local i
     local maxdistmax=100
-    # BBdiag will be used to set maxes and mins if available
-    if [ -n "$BBdiag" ]; then
-        maxdist=$(bc <<< "($BBdiag * 0.05)") #5% of BBdiag
-        maxdistmax="$BBdiag"
+    # num_V will be used to set sample_num if available
+    if [ -n "$num_V" ]; then
+        sample_num=$num_V
+    fi
+    # AABB[diag] will be used to set maxes and mins if available
+    if [ -n "${AABB[diag]}" ]; then
+        maxdist=$(bc <<< "0.05 * ${AABB[diag]}") #5% of AABB[diag]
+        maxdistmax="${AABB[diag]}"
     fi
     
     for i in "$@"; do
@@ -2388,14 +2414,6 @@ mlx_hausdorff_distance() {
                 maxdist="${i#*=}"
                 shift # past argument=value
                 ;;
-            maxdist[pP]erc=*)
-                if [ -n "$BBdiag" ]; then
-                    maxdist=$(bc <<< "0.01 * ${i#*=} * $BBdiag") # $(bc <<< "0.01 * ${i#*=}")
-                else
-                    echo "WARNING: BB diagonal was not found, using default max distance instead. Run do_measure_size first to find BB diag."
-                fi
-                shift # past argument=value
-                ;;
             *)
                 # unknown option
                 ;;
@@ -2420,7 +2438,7 @@ mlx_sampling() {
     # Options & Defaults
     local method="poisson_disk" # Method to use; currently only Poisson-disk is implemented but others (Montecarlo, etc.) may be added later
     local sample_num=1000 # The desired number of samples. The ray of the disk is calculated according to the sampling density.
-    local radius=0 # If not zero this parameter override the previous parameter to allow exact radius specification, max=BBdiag
+    local radius=0 # If not zero this parameter override the previous parameter to allow exact radius specification, max=AABB[diag]
     local montecarloRate=20 # The over-sampling rate that is used to generate the intial Montecarlo samples (e.g. if this parameter is &lt;i>K&lt;/i> means that&lt;i>K&lt;/i> x &lt;i>poisson sample&lt;/i> points will be used). The generated Poisson-disk samples are a subset of these initial Montecarlo samples. Larger this number slows the process but make it a bit more accurate.
     local saveMontecarlo="false" # If true, it will generate an additional Layer with the montecarlo sampling that was pruned to build the poisson distribution.
     local approxGeodesicDist="false" # If true Poisson Disc distances are computed using an approximate geodesic distance, e.g. an euclidean distance weighted by a function of the difference between the normals of the two points.
