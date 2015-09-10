@@ -1,0 +1,14 @@
+<!DOCTYPE MeshLabDocument>
+<MeshLabProject>
+ <MeshGroup>
+  <MLMesh filename="TEST_BUST-simp20K(-8Y).obj" label="TEST_BUST-simp20K(-8Y).obj">
+   <MLMatrix44>
+1 0 0 0 
+0 1 0 -25 
+0 0 1 0 
+0 0 0 1 
+</MLMatrix44>
+  </MLMesh>
+ </MeshGroup>
+ <RasterGroup/>
+</MeshLabProject>
