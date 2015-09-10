@@ -25,11 +25,11 @@
 0 0 0 1 
 </MLMatrix44>
   </MLMesh>
-  <MLMesh label="XY 10d Plane" filename="PLANE.obj">
+  <MLMesh label="XZ 10d Plane" filename="PLANE.obj">
    <MLMatrix44>
 1 0 0 0 
-0 0.984808 -0.173648 0 
 0 0.173648 0.984808 0 
+0 -0.984808 0.173648 0 
 0 0 0 1 
 </MLMatrix44>
   </MLMesh>

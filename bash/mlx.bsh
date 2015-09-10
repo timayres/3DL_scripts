@@ -336,7 +336,7 @@ do_om () {
             if [ "$m_color" = "UV" ] || [ "$color_UV" = "true" ]; then
                 om="$om_flag vc vn fc wt" # colored texture
             else
-                om="$om_flag vc vn" # no colors, or vc only # TODO: test this out!
+                om="$om_flag vc vn" # VC by default. Note that if there are no VC it will assign "white" to every vertex
             fi
             ;;
         [Ss][Tt][Ll] | [Xx][Yy][Zz] | [Dd][Xx][Ff] )
@@ -370,7 +370,7 @@ do_om () {
                 shift # past argument=value
                 ;;
             -*) # remove om option
-                om=${om/??${i#*-}/}
+                om=${om/?${i#*-}/}
                 shift # past argument=value
                 ;;
             *)

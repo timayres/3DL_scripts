@@ -1,12 +1,12 @@
 #!/bin/bash
-#mlx_scratch.bsh
-#license: public domain
+# mlx_scratch.bsh
+# license: public domain
 # scratch script for using mlx functions
 
 #set -x
 scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
 verbosity=6
-delete_TEMP3DP_files="true"
+delete_TEMP3DL_files="true"
 
 #cd "${scriptpath}/../test_models"
 
@@ -18,64 +18,32 @@ if [ -z "$1" ]; then
     set "${scriptpath}/../test_models/PLANE.obj" # Sets 1st positional parameter, use absolute path 
 fi
 
-. ${scriptpath}/3DP-main.bsh
+. ${scriptpath}/apps.bsh
 #. ${scriptpath}/polylinesort.bsh
 
 #cd "${scriptpath}/../test_models/"
 
 #do_metadata "$fbase"
 #do_subfiles "$fbase"
-#do_measure_size "$fbase"
+#measure_AABB "$fbase"
 
+# Generate plane for PLANES.mlp
 if [  ]; then
-    ml_IF="$fbase"
-    #ml_OF="${fpref}-create${meta}.stl"
-    ml_OF="test.obj"
-    ml_SF="TEMP3DP_mlx_scratch.mlx"
-    ml_LF="" # "TEMP3DP_meshlablog.txt"  
+    ml_IF=""
+    ml_OF="PLANE.obj"
     
     mlx_begin
-    
-    # Sample filters:
-    # mlx_measure_geometry #>=1.3.4 # Compute Geometric Measures
-    # mlx_measure_topology #>=1.3.4 # Compute Topological Measures
-    # mlx_del_small_parts
-    # mlx_rotate x=90 # Usage: rotAxis angle
-    # mlx_translate x=0 y=0 z=0 # Usage: transX transY transZ
-    # mlx_scale scale=1 # Usage: scale | scaleX scaleY scaleZ
-    # mlx_section y=0 surface=true #>=1.3.4 # Usage: planeAxis planeOffset (line | surface)
-    # mlx_simplify faces=10000 # Usage: TargetFaceNum
-    # mlx_offset voxel=2 delta=3 # Usage: cellsize offset
-    # mlx_subdivide
-    # mlx_smooth
-    
-    if [  ]; then
-        mlx_offset voxel=1 delta=0.1
-    fi
-
-    if [  ]; then
-        mlx_del_small_parts
-        mlx_measure_topology
-    fi
-    
+    mlx_square size=100 center=true
     mlx_end
-
-    #set -x
-    run_meshlab
-    return_code=$?
+    run_meshlab -vc
 fi
 
 # Create Captain America's shield in MeshLab 2D vertex colored surfaces!
-if [ 1 ]; then
+if [  ]; then
     fn=50 # set number or segments to use for circles
-    #ml_IF="$fbase"
     ml_IF=""
-    ml_SF="TEMP3DP_shield.mlx"
     ml_OF="shield.ply"
     mlx_begin
-    #mlx_del_layer
-    
-    # Create star by scaling 5 squares into diamonds & rotating them around
     
     # Star calculations (consider a central pentagon with 5 triangles attached to the edges)
     r=2 # radius of circumscribing circle
@@ -83,22 +51,21 @@ if [ 1 ]; then
     w=$(bc -l ${scriptpath}/funcs.bc <<< "scale=10;($p*tan(36*pi()/180))") # 1/2 width of pentagon edge/outer triangle bottom
     h=$(bc -l ${scriptpath}/funcs.bc <<< "scale=10;($w/tan(18*pi()/180))") # height of outer triangle
     
+    # Create star by scaling 5 squares into diamonds & rotating them around
     for ((i=1; i <= 5 ; i++)); do
-        mlx_square s=$(bc <<< "scale=10;(sqrt(2))") center=true # create square so length from center to vertices is 1, so side length of sqrt(2)
+        mlx_square s=$(bc <<< "scale=10;(sqrt(2))") center=true color=white # create square with length from center to vertices is 1, so side length of sqrt(2) - thanks Pythagoras!
         mlx_rotate z=45
         mlx_scale x=$w y=$h
         mlx_translate y=$p
         mlx_rotate z=$(bc <<< "scale=10;($i*72)")
     done
     mlx_flatten_layers # flatten star
-    mlx_color_V color=white
-    mlx_translate z=.001 # translate start up slightly so it doesn't overlap circle
+    mlx_translate z=.001 # translate start up slightly so it doesn't overlap center circle
     
     mlx_circle r=2 color=blue
     mlx_circle r1=3 r2=2 color=red
     mlx_circle r1=4 r2=3 color=white
     mlx_circle r1=5 r2=4 color=red
-    
     mlx_flatten_layers
     mlx_end
     
@@ -110,33 +77,18 @@ if [ 1 ]; then
     fi
 fi
 
-# test out various functions before adding them to 3DP-generate_apps.bsh
-if [  ]; then
-    #do_measure_dimension   y=2 $1 z=5
+# test out various functions before adding them to generate_apps.bsh
+if [   ]; then
+    #measure_dimension   y=2 $1 z=5
     #${scriptpath}/../c/polylinesort.bsh test_outline_closed.obj
     #${scriptpath}/../c/polylinesort.exe polylinesort.test
     #${scriptpath}/../c/polylinesort.exe test_4_outlines_closed.obj
 
-    do_polylinesort polylinesort_square_test.obj
-    #do_polylinesort polylinesort.test
-
-    #do_half_bust_FFF "$fbase"
+    #polylinesort polylinesort_square_test.obj
+    #polylinesort polylinesort.test
+    #set -x
+    #half_bust_FFF "$fbase"
+    measure_geometry "$fbase"
 fi
-
-if [  ]; then
-    echo 
-    color=babababa
-    color_name=$(grep -w "$color" "${scriptpath}/color_names.txt")
-    echo color_name = \"$color_name\"
-    r=$(echo "$color_name" | cut -d" " -f3)
-    g=$(echo "$color_name" | cut -d" " -f4)
-    b=$(echo "$color_name" | cut -d" " -f5)
-    
-    echo r=$r, g=$g, b=$b
-    #while read color_name hex r g b; do
-        #r=$r
-    
-fi
-
 
 pause
