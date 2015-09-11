@@ -57,7 +57,7 @@ You will need to manually install the required dependencies; if you install them
 - [ADMesh](https://github.com/admesh/admesh) version 0.98.2, C:/Program Files/admesh
 - [OpenSCAD](http://www.openscad.org/) version 2015.03, C:/Program Files/OpenSCAD
 - [Cygwin](https://www.cygwin.com/) latest version, C:/cygwin64
-- Bash version >4
+- Bash version >= 4.2
   
 __Note that MeshLab version 1.3.4BETA for 64 bit Windows is required.__ Older versions will mostly work but are missing some key features. Most notably, the measure geometry & measure topology filters do not work from meshlabserver in older versions (including 1.3.3), so any apps that depend on these will not work.
   

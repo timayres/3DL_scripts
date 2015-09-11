@@ -12,7 +12,7 @@ hole_dia_test="false"
 sect_xsize=""
 simplified="false"
 
-hollow() {
+do_hollow() {
     # Usage: input_file [output_file]
     #"TEMP3DL_ml_output.stl"
     # " Function to hollow out a solid model by a desired offset (thickness)."
@@ -141,7 +141,7 @@ hollow() {
     ###/Ask for inputs
   
     ###Measure mesh
-    measure_geometry "$hollow_IF_stl"
+    measure_geometry "$do_2stl_OF"
     
     orig_xmin="$xmin"
     orig_xmax="$xmax"
@@ -164,11 +164,22 @@ hollow() {
     fi
     ###/Measure mesh
     
-    h1_pre_process_OF="TEMP3DL_${fpref}_H1-pre_processed${meta}.stl"
-    h2_to_offset_OF="TEMP3DL_${fpref}_H2-to_offset${meta}.stl"
-    h3_offset_OF="TEMP3DL_${fpref}_H3-offset${meta}.stl"
-    h4_neg_vol_OF="${fpref}_H4-neg_vol${meta}.stl"
+    if [ "$bottom_type" = "2" ]; then # rotate to Y up for half bust
+        m_up="Y"
+        set_meta
+        ml_IF="$do_2stl_OF"
+        ml_OF="${fpref}${meta}.stl"
+        hollow_IF_stl="$ml_OF"
+        ml_SF="TEMP3DL_rotate.mlx"
+        
+        mlx_begin
+        mlx_rotate x=-90
+        mlx_end
+        run_meshlab
+        return_code=$?
+    fi
     
+    h1_pre_process_OF="TEMP3DL_${fpref}_H1-pre_processed${meta}.stl"
     ###Pre-process mesh (MeshLab)
     if [ $step_no -eq 1 ]; then
         h1_pre_process "$hollow_IF_stl" "$h1_pre_process_OF"
@@ -179,18 +190,25 @@ hollow() {
         h1_pre_process_OF="$hollow_IF_stl"
     fi
     
+    h2_to_offset_OF="TEMP3DL_${fpref}_H2-to_offset${meta}.stl"
     ###Prepare mesh for offsetting (OpenSCAD)
     if [ $step_no -eq 2 ]; then
         h2_to_offset "$h1_pre_process_OF" "$h2_to_offset_OF"
         ((step_no++))
     fi
     
+    h3_offset_OF="TEMP3DL_${fpref}_H3-offset${meta}.stl"
     ###Offset mesh (MeshLab)
     if [ $step_no -eq 3 ]; then
         h3_offset "$h2_to_offset_OF" "$h3_offset_OF"
         ((step_no++))
     fi
 	
+    if [ "$bottom_type" = "2" ]; then
+        m_up="Z"
+        set_meta
+    fi
+    h4_neg_vol_OF="${fpref}_H4-neg_vol${meta}.stl"
     ###Create negative volume (OpenSCAD)
     if [ $step_no -eq 4 ]; then
         h4_neg_vol "$h3_offset_OF" "$h4_neg_vol_OF"
@@ -302,11 +320,11 @@ orig_zmax=$orig_zmax;
             ;;
         2 ) #magnet
             # Take middle section for extrusion
-            do_h2_Zsection_OF="TEMP3DL_${fpref}_H2-Zsection${meta}.dxf"
+            h2_Zsection_OF="TEMP3DL_${fpref}_H2-Zsection${meta}.dxf"
             
             echo ; echo "Generating middle section: "
             ml_IF="$h1_pre_process_OF"
-            ml_OF="$do_h2_Zsection_OF"
+            ml_OF="$h2_Zsection_OF"
             ml_SF="TEMP3DL_H2_section.mlx"
 
             mlx_begin
@@ -327,7 +345,7 @@ orig_zmax=$orig_zmax;
 bottom_open=$bottom_open;
 
 model_stl=\"$h1_pre_process_OF\";
-model_bottom_section_stl=\"$do_h2_Zsection_OF\";
+model_bottom_section_stl=\"$h2_Zsection_OF\";
     
 grow_offset=$grow_offset;
 thickness=$thickness;
@@ -719,7 +737,7 @@ orig_zmax=$orig_zmax;
     return $return_code
 }
 
-half_bust_FFF() { 
+do_half_bust_FFF() { 
     local return_code
     
     # make an stl version for OpenSCAD processing
@@ -727,8 +745,8 @@ half_bust_FFF() {
     #do_metadata "$1"
     #m_color="NC"
     
-    #half_bust_FFF_IF="$do_2stl_OF"
-    half_bust_FFF_IF="$1"
+    half_bust_FFF_IF="$do_2stl_OF"
+    #half_bust_FFF_IF="$1"
     half_bust_FFF_OF="${fpref}_half_bust_FFF_neg_vol${meta}.stl"
     
     ###Measure mesh
@@ -785,7 +803,7 @@ zmax=$zmax;
 
 # function to put standing figure on a platform
 # Textures are not currently supported since we're using mlx_flatten_layers
-platform_FFF() {
+do_platform_FFF() {
     local return_code
     
     do_2stl "$1" #this will also run do_metadata, set m_color=NC & perform an admesh check
@@ -841,7 +859,7 @@ platform_FFF() {
     return $return_code
 }
 
-scad_template() { 
+do_scad_template() { 
     local return_code
     
     # make an stl version for OpenSCAD processing

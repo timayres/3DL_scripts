@@ -8,7 +8,7 @@
 measure_AABB() {
     # Measure AABB by sorting XYZ point cloud
     
-    declare -A AABB # associative array
+    declare -gA AABB # associative array, global
     
     case "${1##*.}" in # check file extension of input
         [Xx][Yy][Zz] )

@@ -37,12 +37,12 @@ for a in $apps ; do
 done
 
 for a in $modeling_apps ; do
-    app_name="3DL-$a"
+    app_name="3DL_mod-$a"
     rm "${app_name}.bsh"
     if [[ $(uname -s) == CYGWIN* ]]; then
-        rm "../apps/modeling/${app_name}.cmd"
+        rm "../apps/${app_name}.cmd"
     elif [[ $(uname -s) == Linux* ]]; then
-        rm "../apps/modeling/${app_name}.desktop"
+        rm "../apps/${app_name}.desktop"
     fi
 done
 

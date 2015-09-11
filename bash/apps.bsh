@@ -862,6 +862,7 @@ do_2stl () {
         # * ) # all other file extensions
             echo ; echo "Saving as binary stl: "
             
+            ml_IF="$1"
             # Make sure Z is up
             if [ "$m_up" = "Y" ]; then
                 m_up="Z"
@@ -876,7 +877,6 @@ do_2stl () {
             fi
             
             do_2stl_OF="${fpref}${meta}.stl"
-            ml_IF="$1"
             ml_OF="$do_2stl_OF"
             
             run_meshlab

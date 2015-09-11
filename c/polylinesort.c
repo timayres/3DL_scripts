@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 //
 // boolean variables
@@ -34,6 +35,7 @@ int loop_cnt = 0;
 //  V[] - vertice "v" points x, y, and z
 //  L[] - line set "l" points p1 and p2
 //  sorted_points[] - sorted polyline points
+//  polyline_lengths - total length of each polyline
 //
 struct line_set {
   int p1;
@@ -49,13 +51,14 @@ struct vertices_set {
 struct vertices_set *V;
 struct line_set *L;
 int *sorted_points;
+double polyline_lengths[256];
 
-// write polyline function
 void write_polyline();
+void write_lengths();
 
 /****************************************************************
 *
-*              Start of Main Porgram
+*              Start of Main Program
 *
 *****************************************************************/
 int main (int argc, char *argv[])
@@ -338,6 +341,9 @@ int main (int argc, char *argv[])
     }
 
   printf("End of line sets \n");
+
+  // write the polyline lengths
+  write_lengths();
   free(L);
   free(V);
   free(sorted_points);
@@ -351,9 +357,11 @@ void write_polyline()
   {
   // output file name
   char filename[] = "polyline%d.xyz";
-
   int j,k;
   int temp_point;
+  int p1,p2;
+  double line_length;
+  double total_length=0;
   FILE *fpo;               // output file pointer
   char outfile[256];
 
@@ -362,16 +370,37 @@ void write_polyline()
   else
     printf("Polyline %d is an open polyline set of %d points \n", num_polylines - 1, sort_cnt);
 
-  // print the sorted line sets
+  // print the sorted line sets and line lengths
   for (j = 1, k = 0; j < sort_cnt; j++, k++)
-    printf("%d %d \n", sorted_points[k], sorted_points[j]);
-  if (closed_polyline)
-    printf("%d %d \n", sorted_points[k], sorted_points[0]);
+    {
+    p1 = sorted_points[k] - 1;
+    p2 = sorted_points[j] - 1;
+    line_length = sqrt(pow(V[p2].x - V[p1].x, 2) +
+                       pow(V[p2].y - V[p1].y, 2) +
+                       pow(V[p2].z - V[p1].z, 2));
+    total_length += line_length;
 
+    printf("%d %d length %f \n", sorted_points[k], sorted_points[j], line_length);
+    }
+  if (closed_polyline)
+    {
+    p1 = sorted_points[k] - 1;
+    p2 = sorted_points[0] - 1;
+    line_length = sqrt(pow(V[p2].x - V[p1].x, 2) +
+                       pow(V[p2].y - V[p1].y, 2) +
+                       pow(V[p2].z - V[p1].z, 2));
+    total_length += line_length;
+
+    printf("%d %d length %f \n", sorted_points[k], sorted_points[0], line_length);
+    }
+
+  // save the polyline length
+  polyline_lengths[num_polylines - 1] = total_length;
+  printf("Total polyline length %f \n", total_length);
+
+  // open polyline output file
   sprintf(outfile, filename, num_polylines - 1);
   remove(outfile);
-
-  // open output file
   fpo = fopen(outfile,"w");
   if (fpo == NULL)
     {
@@ -395,5 +424,36 @@ void write_polyline()
     }
 
   fclose(fpo);
+  }
+
+/************************************/
+/* write polyline lengths function  */
+/************************************/
+void write_lengths()
+  {
+  char filename[] = "polyline_lengths.txt";
+  FILE *fp;
+  int i;
+
+  // open polyline lengths output file
+  remove(filename);
+  fp = fopen(filename,"w");
+  if (fp == NULL)
+    {
+    printf("Error opening output file %s \n", filename);
+    return;
+    }
+
+  printf("Writing polyline lengths to %s \n", filename);
+
+  for (i = 0; i < num_polylines; i++)
+    {
+    printf("%f ", polyline_lengths[i]);
+    fprintf(fp,"%f ", polyline_lengths[i]);
+    }
+
+  printf("\n");
+  fprintf(fp,"\n");
+  fclose(fp);
   }
 

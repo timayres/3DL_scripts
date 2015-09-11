@@ -8,8 +8,13 @@ cd "$scriptpath"
 . ./mlx.bsh
 
 # compile c programs
-if [ ! -x polylinesort ] || [ ! -x polylinesort.exe ]; then
+
+if [ ! -x "../c/polylinesort" ] || [ ! -x "../c/polylinesort.exe" ]; then
     gcc -Wall ../c/polylinesort.c -o ../c/polylinesort
+fi
+
+if [ ! -x "../c/AABB" ] || [ ! -x "../c/AABB.exe" ]; then
+    gcc -Wall ../c/AABB.c -o ../c/AABB
 fi
 
 gen_mlx_scratch_shortcuts="true"
@@ -44,6 +49,9 @@ check_mesh
 pricing
 simplify
 rename
+"
+
+pause_mod_apps="
 hollow
 half_bust_FFF
 platform_FFF
@@ -148,20 +156,22 @@ if [[ $(uname -s) == CYGWIN* ]]; then
 fi
     
 for a in $apps ; do
-    gen_bash "3DL-$a" "$a"
+    app_name="3DL-$a"
+    gen_bash "$app_name" "$a"
     if [[ $(uname -s) == CYGWIN* ]]; then
-        gen_cmd "../apps/" "3DL-$a"
+        gen_cmd "../apps/" "$app_name"
     elif [[ $(uname -s) == Linux* ]]; then
-        gen_desktop "../apps/" "3DL-$a"
+        gen_desktop "../apps/" "$app_name"
     fi
 done
 
 for a in $modeling_apps ; do
-    gen_bash "3DL-$a" "$a"
+    app_name="3DL_mod-$a"
+    gen_bash "$app_name" "$a"
     if [[ $(uname -s) == CYGWIN* ]]; then
-        gen_cmd "../apps/modeling/" "3DL-$a"
+        gen_cmd "../apps/" "$app_name"
     elif [[ $(uname -s) == Linux* ]]; then
-        gen_desktop "../apps/modeling/" "3DL-$a"
+        gen_desktop "../apps/" "$app_name"
     fi
 done
 
@@ -172,12 +182,17 @@ for a in $pause_apps ; do
     echo "pause \"Hit any key to close window ... \"" >> "${app_name}.bsh"
 done
 
+for a in $pause_mod_apps ; do
+    app_name="3DL_mod-$a"
+    echo "pause \"Hit any key to close window ... \"" >> "${app_name}.bsh"
+done
+
 # change verbosity of certain apps, e.g. for troubleshooting
-sed -i "s/verbosity=2/verbosity=6/" "3DL-hollow.bsh"
-sed -i "s/verbosity=2/verbosity=3/" "3DL-half_bust_FFF.bsh"
-sed -i "s/verbosity=2/verbosity=3/" "3DL-platform_FFF.bsh"
+sed -i "s/verbosity=2/verbosity=6/" "3DL_mod-hollow.bsh"
+sed -i "s/verbosity=2/verbosity=3/" "3DL_mod-half_bust_FFF.bsh"
+sed -i "s/verbosity=2/verbosity=3/" "3DL_mod-platform_FFF.bsh"
 sed -i "s/verbosity=2/verbosity=3/" "3DL-2stl.bsh"
-sed -i "s/delete_TEMP3DL_files=\"true\"/delete_TEMP3DL_files=\"false\"/" "3DL-hollow.bsh"
+sed -i "s/delete_TEMP3DL_files=\"true\"/delete_TEMP3DL_files=\"false\"/" "3DL_mod-hollow.bsh"
 
 # Generate shortcuts for mlx_scratch.bsh
 if [ "$gen_mlx_scratch_shortcuts" = "true" ]; then
