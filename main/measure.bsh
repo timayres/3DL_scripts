@@ -232,23 +232,23 @@ measure_dimension() {
     if [ "$axis1" = "z" ] || [ "$axis2" = "z" ]; then
         if [ "$axis1" = "y" ] || [ "$axis2" = "y" ]; then
             axis3="x"
-            do_measure_dimesnion_OF="${ml_OF%.*}.${axis3}"
-            awk '{print $1}' "$ml_OF" > "$do_measure_dimesnion_OF"
+            measure_dimesnion_OF="${ml_OF%.*}.${axis3}"
+            awk '{print $1}' "$ml_OF" > "$measure_dimesnion_OF"
         else
             axis3="y"
-            do_measure_dimesnion_OF="${ml_OF%.*}.${axis3}"
-            awk '{print $2}' "$ml_OF" > "$do_measure_dimesnion_OF"
+            measure_dimesnion_OF="${ml_OF%.*}.${axis3}"
+            awk '{print $2}' "$ml_OF" > "$measure_dimesnion_OF"
         fi
     else
         axis3="z"
-        do_measure_dimesnion_OF="${ml_OF%.*}.${axis3}"
-        awk '{print $3}' "$ml_OF" > "$do_measure_dimesnion_OF"
+        measure_dimesnion_OF="${ml_OF%.*}.${axis3}"
+        awk '{print $3}' "$ml_OF" > "$measure_dimesnion_OF"
     fi
     
-    # sort "$do_measure_dimesnion_OF", find max & min
-    sort -n -o "$do_measure_dimesnion_OF" "$do_measure_dimesnion_OF"
-    axismin=$(head -1 "$do_measure_dimesnion_OF")
-    axismax=$(tail -1 "$do_measure_dimesnion_OF")
+    # sort "$measure_dimesnion_OF", find max & min
+    sort -n -o "$measure_dimesnion_OF" "$measure_dimesnion_OF"
+    axismin=$(head -1 "$measure_dimesnion_OF")
+    axismax=$(tail -1 "$measure_dimesnion_OF")
     axissize=$(bc <<< "($axismax - $axismin)")
     
     if [ "$verbosity" -ge 2 ]; then

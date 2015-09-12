@@ -6,9 +6,6 @@
 
 # TODO: update test_model, update scad files to reference it. Use at least 1:8 model so it works with half-bust.
 
-# TODO: remove do_ prefix?
-
-
 # TODO: write script to generate test models? At least write mlp file to translate model for bobblehead testing
 
 # TODO: parse ADMesh output
@@ -87,14 +84,17 @@ do_metadata () {
 
     ###### Check metadata #####
     
-    ##Note: this is here instead of in do_rename since fpref is reset at the 
+    ##Note: this is here instead of in app_rename since fpref is reset at the 
     #+ start of do_metadata
     ###Rename fpref
     if [ "$rename_fpref" = "true" ]; then
         echo
-        echo "Enter the subject of the mesh, using a descriptive base name for the mesh, such as \"Subject_Bust\""
-        echo "NO SPACES OR PERIODS. Use an underscore \"_\" or dashes \"-\" to separate words."
-        echo -n "Enter the new base name or hit enter to keep the current name \"${fpref}\": "
+        echo "Enter the subject of the mesh, using a descriptive base name for the mesh,"
+        echo "such as \"Subject_Bust\". NO: SPACES COMMAS."
+        echo "Use an underscore \"_\" or dashes \"-\" to separate words."
+        echo "Enter the new base name or hit enter to keep the current name:"
+        echo " Current Name: \"${fpref}\""
+        echo -n " New Name: "
         read fpref_input
         if [ -n "$fpref_input" ]; then #-n is true if string is non-zero
             fpref="${fpref_input}"
@@ -183,7 +183,7 @@ do_metadata () {
     done
     ### End check m_up
 
-    #do_subfiles "$1" # don't want this here, e.g. for do_2stl.
+    #do_subfiles "$1" # don't want this here, e.g. for 2stl.
     
     set_meta
   
@@ -218,7 +218,7 @@ delete_originals() { # not currently used
     return 0
 }
 
-do_fix_mesh() {
+fix_mesh() {
     ##Function to automatically fix mesh, particularly after resampling
     
     local return_code
@@ -391,7 +391,7 @@ do_fix_mesh() {
     return $return_code
 }
 
-do_check_mesh() {
+app_check_mesh() {
     ##Function to check mesh by running "Compute Topological Measures" in ML
     ##TODO: add additional options to try to fix any issues found
     
@@ -411,7 +411,7 @@ do_check_mesh() {
     return $return_code
 }
 
-do_repair() {
+app_repair() {
     ##Function to check mesh by running "Compute Topological Measures" in ML
     ##TODO: add additional options to try to fix any issues found
     
@@ -471,19 +471,19 @@ do_union() {
     echo ; echo "Performing a boolean union on the following meshes: "
     printf "    %s\n" "$@"
     
-    do_union_scad_OF="TEMP3DL_${fpref}_union${meta}.scad"
-    do_union_OF="${fpref}_union${meta}.stl"
+    union_scad_OF="TEMP3DL_${fpref}_union${meta}.scad"
+    union_OF="${fpref}_union${meta}.stl"
     
     echo "\
-union() {" > "$do_union_scad_OF"
+union() {" > "$union_scad_OF"
 for i in "$@"; do
     echo "\
-import (file=\"$i\");" >> "$do_union_scad_OF"
+import (file=\"$i\");" >> "$union_scad_OF"
 done
     echo "\
-}" >> "$do_union_scad_OF"
+}" >> "$union_scad_OF"
            
-    run_openscad "$do_union_scad_OF" "$do_union_OF" 
+    run_openscad "$union_scad_OF" "$union_OF" 
     return_code=$?
     
     
@@ -493,7 +493,7 @@ done
     # Answer: on Windows it copies the entire file path to the terminal, but does not press enter
 }
 
-do_simplify() {
+app_simplify() {
     
     local return_code
     local faces
@@ -504,7 +504,10 @@ do_simplify() {
     do_subfiles "$1"
     #fi
     
+    old_verbosity="$verbosity"
+    verbosity=1
     measure_all "$1"
+    verbosity="$old_verbosity"
     
     avg_face_area=$(bc <<< "scale=10;($area_mm2/$num_F)")
     avg_face_area_100=$(bc <<< "scale=10;($avg_face_area*100)")
@@ -518,7 +521,7 @@ do_simplify() {
     echo "  Average Face Area (100 mm^2): "$(printf %.2f "$avg_face_area_100")
     echo ;
     echo "  Enter the target number of faces or hit enter to"
-    echo -n " accept the default ($half_F): "
+    echo -n "  accept the default ($half_F): "
     read faces
     if [ -z "$faces" ]; then
         faces="$half_F"
@@ -526,14 +529,14 @@ do_simplify() {
     
     # Set output file name
     if [ -z "$2" ]; then
-        do_simplify_OF="${fpref}-simp$(($faces/1000))K${meta}.${1##*.}"
+        simplify_OF="${fpref}-simp$(($faces/1000))K${meta}.${1##*.}"
     else
-        do_simplify_OF="$2"
+        simplify_OF="$2"
     fi
     
     echo ; echo "Simplifying mesh ... "
     ml_IF="$1"
-    ml_OF="$do_simplify_OF"    
+    ml_OF="$simplify_OF"
     ml_SF="TEMP3DL_simplify.mlx"
     
     mlx_begin
@@ -542,11 +545,11 @@ do_simplify() {
     run_meshlab
     return_code=$?
     
-    return_file="$do_simplify_OF" 
+    return_file="$simplify_OF"
     return $return_code
 }
 
-do_pricing  () {
+app_pricing  () {
     echo
     echo "Pricing: this function calculates the price for full color stone material from various 3D printing services."
     
@@ -579,11 +582,12 @@ do_pricing  () {
 
     # Sculpteo: they do not publish their pricing formula
     # need to run some tests to determine formula
-
+    
+    return_file="$1"
     return $return_code
 }
 
-do_scale () {
+app_scale () {
     #echo
     #echo "Scale: this function scales the mesh using MeshLab"
   
@@ -679,11 +683,11 @@ do_scale () {
     # Prepare output options
     #m_scale=${m_scale/./,} #replace period with comma
     set_meta
-    do_scale_OF="${fpref}${meta}.${1##*.}"
+    scale_OF="${fpref}${meta}.${1##*.}"
     
     echo ; echo "Scaling mesh: "
     ml_IF="$1"
-    ml_OF="$do_scale_OF"
+    ml_OF="$scale_OF"
     ml_SF="TEMP3DL_scale.mlx"
 
     mlx_begin
@@ -692,11 +696,11 @@ do_scale () {
     run_meshlab
     return_code=$?
     
-    return_file="$do_scale_OF"
+    return_file="$scale_OF"
     return $return_code
 }
 
-do_swapYZ () {
+app_swapYZ () {
     # Usage: input_file output_file
     # if output_file is blank then the output file name will be automatically set based on the input file name & metadata
     # and the original file will be deleted.
@@ -721,14 +725,14 @@ do_swapYZ () {
     
     # Set output file name
     if [ -z "$2" ]; then
-        do_swapYZ_OF="${fpref}${meta}.${1##*.}"
+        swapYZ_OF="${fpref}${meta}.${1##*.}"
     else
-        do_swapYZ_OF="$2"
+        swapYZ_OF="$2"
     fi
     
     echo ; echo "Rotating mesh ... "
     ml_IF="$1"
-    ml_OF="$do_swapYZ_OF"    
+    ml_OF="$swapYZ_OF"    
     ml_SF="TEMP3DL_rotate.mlx"
     
     mlx_begin
@@ -744,11 +748,11 @@ do_swapYZ () {
     #     fi
     # fi
     
-    return_file="$do_swapYZ_OF" 
+    return_file="$swapYZ_OF" 
     return $return_code
 }
 
-do_rename () {
+app_rename () {
     # "Rename: function to rename file (and associated material & texture files) & set metadata."
     
     local return_code
@@ -762,8 +766,7 @@ do_rename () {
         set_meta
         
         #add _B to end of name for bust, just ask for base name
-        echo "Enter the subject of the mesh, using an underscore \"_\" in place of a space,"
-        echo "for example \"Tim\" or \"Tim_&_Bridget\". This is the name that will be imprinted on the object."
+        echo "Enter the subject of the mesh, using an underscore \"_\" in place of a space."
         read mesh_name
         fpref="$mesh_name"
         echo -n "Is this a bust? \"Enter\" for yes or \"n\" for no: "
@@ -780,17 +783,17 @@ do_rename () {
         do_subfiles "$1"
     fi
 
-    do_rename_OF="${fpref}${meta}.${1##*.}"
+    rename_OF="${fpref}${meta}.${1##*.}"
     #set -x
-    if [ "$1" != "$do_rename_OF" ]; then 
-        cp "$1" "$do_rename_OF"
+    if [ "$1" != "$rename_OF" ]; then 
+        cp "$1" "$rename_OF"
         case "${1##*.}" in # check file extension of input
             [Oo][Bb][Jj] )
                 if [ "$m_color" = "UV" ]; then
                     # Rename material file
-                    cp "${material_file}" "${do_rename_OF}.mtl"
+                    cp "${material_file}" "${rename_OF}.mtl"
             #        rm -f "${material_file}" # delete original material file
-                    sed -i "s/${material_file}/${do_rename_OF}.mtl/" "$do_rename_OF"
+                    sed -i "s/${material_file}/${rename_OF}.mtl/" "$rename_OF"
                 
                     # Rename texture files
                     if [ "$fpref_full" = "model_mesh" ]; then
@@ -798,7 +801,7 @@ do_rename () {
                         texture_file_ext="${texture_files_unique[0]##*.}" # extension
                         texture_file_pref_new="${fpref}_texture-v0"
                         gm convert ${texture_files_unique[0]} "${texture_file_pref_new}.png"
-                        sed -i "s/${texture_file_pref}.${texture_file_ext}/${texture_file_pref_new}.png/" "${do_rename_OF}.mtl"
+                        sed -i "s/${texture_file_pref}.${texture_file_ext}/${texture_file_pref_new}.png/" "${rename_OF}.mtl"
                     else
                         i=0
                         while [ $i -lt ${#texture_files_unique[@]} ]; do
@@ -806,7 +809,7 @@ do_rename () {
                             texture_file_ext="${texture_files_unique[$i]##*.}" # extension
                             texture_file_pref_new="${fpref}_texture_$i"
                             cp ${texture_files_unique[$i]} "$texture_file_pref_new.$texture_file_ext"
-                            sed -i "s/${texture_file_pref}/${texture_file_pref_new}/" "${do_rename_OF}.mtl"
+                            sed -i "s/${texture_file_pref}/${texture_file_pref_new}/" "${rename_OF}.mtl"
                             i=$(($i+1))
                         done
                     fi
@@ -822,11 +825,11 @@ do_rename () {
     #set +x
 
     if [ "$fpref_full" = "model_mesh" ]; then
-        #do_scale to -10
+        #scale to -10
         scale="100"
         
-        ml_IF="$do_rename_OF"
-        ml_OF="$do_rename_OF"        
+        ml_IF="$rename_OF"
+        ml_OF="$rename_OF"        
         ml_SF="TEMP3DL_scale.mlx"
         
         mlx_begin
@@ -836,13 +839,13 @@ do_rename () {
         run_meshlab
         return_code=$?
     fi
-    return_file="$do_rename_OF"
+    return_file="$rename_OF"
     return $return_code
 }
 
-do_2stl () {
+app_2stl () {
     # Usage: input_file
-    # returns do_2stl_OF, admesh_LF
+    # returns _2stl_OF, admesh_LF
 
     # 2stl: function to convert file to binary stl (no color) using MeshLab
     # will also convert ascii stls to binary
@@ -857,7 +860,7 @@ do_2stl () {
     
     # case "${1##*.}" in # check file extension of input
         # [Ss][Tt][Ll] )
-            # do_2stl_OF="$1"
+            # _2stl_OF="$1"
             # ;;  
         # * ) # all other file extensions
             echo ; echo "Saving as binary stl: "
@@ -876,15 +879,15 @@ do_2stl () {
                 ml_SF=""
             fi
             
-            do_2stl_OF="${fpref}${meta}.stl"
-            ml_OF="$do_2stl_OF"
+            _2stl_OF="${fpref}${meta}.stl"
+            ml_OF="$_2stl_OF"
             
             run_meshlab
             return_code=$?
             # ;;
     # esac
     
-    run_admesh "$do_2stl_OF" # no output file; check only
+    run_admesh "$_2stl_OF" # no output file; check only
    
     #if [ "$app_name" = "3DL-2stl" ] || [ "$verbosity" -ge 3 ]; then
     #if [ "$verbosity" -ge 3 ]; then
@@ -892,11 +895,11 @@ do_2stl () {
         cat "$admesh_LF"
     #fi
     
-    return_file="$do_2stl_OF"
+    return_file="$_2stl_OF"
     return $return_code
 }
 
-do_2objNC () {
+app_2objNC () {
     # Usage: input_file output_file
     # if output_file is blank then the output file name will be automatically set based on the input file name & metadata
     # "2objNC: function to convert to obj file with no color data."
@@ -908,23 +911,23 @@ do_2objNC () {
     if [ -z "$2" ]; then
         do_metadata "$1"
         m_color="NC"
-        do_2objNC_OF="${fpref}-NC${meta}.obj"
+        _2objNC_OF="${fpref}-NC${meta}.obj"
     else
         m_color="NC"
-        do_2objNC_OF="${2%.*}.obj"
+        _2objNC_OF="${2%.*}.obj"
     fi
     
     echo ; echo "Removing color data from mesh: "
     ml_IF="$1"
-    ml_OF="$do_2objNC_OF"    
+    ml_OF="$_2objNC_OF"    
     ml_SF=""
     run_meshlab
     return_code=$?
-    return_file="$do_2objNC_OF" 
+    return_file="$_2objNC_OF" 
     return $return_code
 }
 
-do_2x3dz () {
+app_2x3dz () {
     # "2x3dz: this function converts a model to x3d format and wraps it along with the associated texture file into a zip file. Primarily intended for submitting color models to Shapeways."
     
     local return_code
@@ -950,7 +953,7 @@ do_2x3dz () {
     return $return_code
 }
 
-do_2daez () {
+app_2daez () {
     # "2daez: this function converts a model to Collada dae format and wraps it along with the associated texture file into a zip file. Primarily intended for submitting color models to Shapeways."
     
     local return_code
@@ -976,7 +979,7 @@ do_2daez () {
     return $return_code
 }
 
-do_2objz () {
+app_2objz () {
     # "obj2objz: this function wraps an obj file and its associated material and texture files into a zip file. Primarily intended for submitting color models to Sculpteo & i.Materialize, but can also be used as a handy way to gather all the associated files together for moving or copying to a different location."
   
     #TODO: Sculpteo wants models in Z up!
@@ -1000,9 +1003,11 @@ do_2objz () {
             exit 1
             ;;
     esac
+    return_file="${fpref_full}.obj.zip"
+    return $return_code
 }
 
-do_center () {
+app_center () {
     # Usage: input_file
     # output name is same as input name (original is deleted)
     ## Function to center mesh base on the bottom cross section
@@ -1076,15 +1081,15 @@ do_center () {
     return_code=$?
     
     if [  ]; then #[ -e "$ml_OF" ]; then #rename output to input
-        rm -f "$do_center_bottom_IF"
-        mv "$ml_OF" "$do_center_bottom_IF"
+        rm -f "$center_bottom_IF"
+        mv "$ml_OF" "$center_bottom_IF"
         case "${1##*.}" in # check file extension
             [Oo][Bb][Jj] )
                 if [ "$m_color" = "UV" ]; then
                     # Rename material file
                     rm -f "${ml_IF}.mtl"
-                    mv "${ml_OF}.mtl" "${do_center_bottom_IF}.mtl"
-                    sed -i "s/${ml_OF}/${do_center_bottom_IF}/" "$do_center_bottom_IF"
+                    mv "${ml_OF}.mtl" "${center_bottom_IF}.mtl"
+                    sed -i "s/${ml_OF}/${center_bottom_IF}/" "$center_bottom_IF"
                 fi
                 ;;
         esac
@@ -1094,7 +1099,7 @@ do_center () {
     return $return_code
 }
 
-do_center_x () {
+app_center_x () {
     # Usage: input_file
     # output name is same as input name (original is deleted)
     ## Function to center mesh base on the bottom cross section
@@ -1164,15 +1169,15 @@ do_center_x () {
     return_code=$?
     
     if [  ]; then #[ -e "$ml_OF" ]; then #rename output to input
-        rm -f "$do_center_bottom_IF"
-        mv "$ml_OF" "$do_center_bottom_IF"
+        rm -f "$center_bottom_IF"
+        mv "$ml_OF" "$center_bottom_IF"
         case "${1##*.}" in # check file extension
             [Oo][Bb][Jj] )
                 if [ "$m_color" = "UV" ]; then
                     # Rename material file
                     rm -f "${ml_IF}.mtl"
-                    mv "${ml_OF}.mtl" "${do_center_bottom_IF}.mtl"
-                    sed -i "s/${ml_OF}/${do_center_bottom_IF}/" "$do_center_bottom_IF"
+                    mv "${ml_OF}.mtl" "${center_bottom_IF}.mtl"
+                    sed -i "s/${ml_OF}/${center_bottom_IF}/" "$center_bottom_IF"
                 fi
                 ;;
         esac

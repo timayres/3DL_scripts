@@ -1,26 +1,27 @@
-//do_half_bust_FFF function
+//half_bust_FFF function
 
 //variables set via calling script
 
-model_stl="Kabbie_eyes_magnet(repaired1)simp100K(-6Y).stl";
+model_stl="../test_models/TEST_BUST-simp20K(-8Z).stl";
 
-magnet_z_pos=13.0376008;
 thickness=3;
+magnet_z_pos=10.7804222;
 
-center_of_mass_x=-2.178563;
-center_of_mass_y=-2.861163;
-center_of_mass_z=22.565252;
+center_of_mass_x=0.690921;
+center_of_mass_y=-1.400397;
+center_of_mass_z=18.289526;
 
-barycenter_x=-2.002550;
-barycenter_y=-3.993661;
-barycenter_z=20.588537;
+barycenter_x=0.681426;
+barycenter_y=-1.816130;
+barycenter_z=16.964798;
 
-xmin=-42.608002;
-xmax=41.578003;
-ymin=-25.411917;
-ymax=17.254002;
-zmin=-0.096819;
-zmax=65.188004;
+xmin=-29.564501;
+xmax=31.325228;
+ymin=-20.634674;
+ymax=15.724438;
+zmin=-0.827112;
+zmax=53.902111;
+
 /**********CUT LINE**********/
 // Everything above this line will be replaced by calling script
 // License: LGPLv2.1

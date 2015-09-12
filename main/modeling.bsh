@@ -2,17 +2,15 @@
 #hollow.bsh
 #license: LGPLv2.1
 
-# TODO: correct m_up in half bust to Y after step 1
 # TODO: add back in steps 2 & 3, adding an inset rim and a single hole
 
-#do_offset
 thickness=""
 rim_inset_test="false"
 hole_dia_test="false"
 sect_xsize=""
 simplified="false"
 
-do_hollow() {
+app_hollow() {
     # Usage: input_file [output_file]
     #"TEMP3DL_ml_output.stl"
     # " Function to hollow out a solid model by a desired offset (thickness)."
@@ -23,8 +21,8 @@ do_hollow() {
     # openscad, try just doing a projection on imported mesh; if that doesn't work then the mesh needs to be fixed 
 
     # make an stl version for OpenSCAD processing
-    do_2stl "$1" #this will also run do_metadata & set m_color=NC
-    hollow_IF_stl="$do_2stl_OF"
+    app_2stl "$1" #this will also run do_metadata & set m_color=NC
+    hollow_IF_stl="$_2stl_OF"
   
     # Set output file name - not currently used since we aren't scripting the entire hollowing. The final step needs to be done in blender.
     # if [ -z "$2" ]; then # automatically name output file
@@ -82,8 +80,6 @@ do_hollow() {
             1 ) # open bottom
                 bottom_type_test="true"
                 bottom_open="true"
-                #do_section "0" "$hollow_IF_stl" "TEMP3DL_${fpref}-section.dxf" # find section for bottom extrusion
-                #bottom_section="$do_section_OF"
                 ;;
             2 ) # half bust with magnet boss
                 bottom_type_test="true"
@@ -101,8 +97,6 @@ do_hollow() {
                 bottom_open="false"
                 echo "Bottom type $bottom_type is not yet implemented"
                 exit 1
-                #do_section "0" "$hollow_IF_stl" "TEMP3DL_${fpref}-section.dxf" # find section for rim generation
-                #bottom_section="$do_section_OF"
                 ;;
             5 ) # single hole
                 bottom_type_test="true"
@@ -141,7 +135,7 @@ do_hollow() {
     ###/Ask for inputs
   
     ###Measure mesh
-    measure_geometry "$do_2stl_OF"
+    measure_geometry "$_2stl_OF"
     
     orig_xmin="$xmin"
     orig_xmax="$xmax"
@@ -167,7 +161,7 @@ do_hollow() {
     if [ "$bottom_type" = "2" ]; then # rotate to Y up for half bust
         m_up="Y"
         set_meta
-        ml_IF="$do_2stl_OF"
+        ml_IF="$_2stl_OF"
         ml_OF="${fpref}${meta}.stl"
         hollow_IF_stl="$ml_OF"
         ml_SF="TEMP3DL_rotate.mlx"
@@ -253,7 +247,7 @@ h1_pre_process() { # MeshLab
     run_meshlab
     return_code=$?
     
-    do_fix_mesh "$ml_OF"    
+    fix_mesh "$ml_OF"    
     h1_pre_process_OF="$return_file"
     
     return_file="$h1_pre_process_OF"
@@ -281,11 +275,11 @@ h2_to_offset() { # OpenSCAD
         1 | 4 | 5 | 6 ) #open & closed bottoms
             if [ "$bottom_type" = "1" ]; then
                 # Take bottom section for extrusion
-                do_h2_Zsection_OF="TEMP3DL_${fpref}_H2-Zsection${meta}.dxf"
+                h2_Zsection_OF="TEMP3DL_${fpref}_H2-Zsection${meta}.dxf"
 
                 echo ; echo "Generating bottom section: "
                 ml_IF="$h1_pre_process_OF"
-                ml_OF="$do_h2_Zsection_OF"
+                ml_OF="$h2_Zsection_OF"
                 ml_SF="TEMP3DL_H2_section.mlx"
 
                 mlx_begin
@@ -305,7 +299,7 @@ h2_to_offset() { # OpenSCAD
 bottom_open=$bottom_open;
 
 model_stl=\"$h1_pre_process_OF\";
-model_bottom_section_stl=\"$do_h2_Zsection_OF\";
+model_bottom_section_stl=\"$h2_Zsection_OF\";
 
 grow_offset=$grow_offset;
 thickness=$thickness;
@@ -475,7 +469,7 @@ h3_offset() { # MeshLab
     run_meshlab
     return_code=$?
 	
-    do_fix_mesh "$ml_OF" 
+    fix_mesh "$ml_OF" 
     
     # 2nd offset
 
@@ -494,7 +488,7 @@ h3_offset() { # MeshLab
     run_meshlab
     return_code=$?
 	
-    do_fix_mesh "$ml_OF"
+    fix_mesh "$ml_OF"
 	h3_offset_OF="$return_file"
     
     return_file="$h3_offset_OF"
@@ -581,8 +575,8 @@ orig_barycenter_z=$orig_barycenter_z;
         
             # Find center coordinates by offsetting bottom projection
             echo ; echo "Finding center of opening ... "
-            do_h4_find_center_scad_OF="TEMP3DL_${fpref}_H4-find_center${meta}.scad"
-            do_h4_find_center_OF="TEMP3DL_${fpref}_H4-find_center${meta}.stl"
+            h4_find_center_scad_OF="TEMP3DL_${fpref}_H4-find_center${meta}.scad"
+            h4_find_center_OF="TEMP3DL_${fpref}_H4-find_center${meta}.stl"
             
             echo "\
 // Inset bottom projection to find center approximation
@@ -590,11 +584,11 @@ orig_barycenter_z=$orig_barycenter_z;
 bottom_section_width=$xsize;
 
 linear_extrude (height = 10) offset (delta = -0.9*bottom_section_width/2) projection() import (file=\"$h2_simp_bottom_section_OF\");
-" > "$do_h4_find_center_scad_OF"
+" > "$h4_find_center_scad_OF"
             
-            run_openscad "$do_h4_find_center_scad_OF" "$do_h4_find_center_OF" 
+            run_openscad "$h4_find_center_scad_OF" "$h4_find_center_OF" 
             return_code=$?
-            measure_AABB "$do_h4_find_center_OF"
+            measure_AABB "$h4_find_center_OF"
             
             # Find height of offset volume at center location
             measure_dimension "$h3_offset_OF" x=$xcenter y=$ycenter
@@ -602,10 +596,10 @@ linear_extrude (height = 10) offset (delta = -0.9*bottom_section_width/2) projec
             
             ###Take cross section 1 radius up for fillet, simplify
             echo ; echo "Generating offset section for bottom fillet ... "
-            do_h4_offset_fillet_sect_OF="TEMP3DL_${fpref}_H4-offset_section${meta}.stl"
+            h4_offset_fillet_sect_OF="TEMP3DL_${fpref}_H4-offset_section${meta}.stl"
             
             ml_IF="$h1_pre_process_OF"
-            ml_OF="$do_h4_offset_fillet_sect_OF"
+            ml_OF="$h4_offset_fillet_sect_OF"
             ml_SF="TEMP3DL_H4-offset_section.mlx"
             
             mlx_begin
@@ -627,7 +621,7 @@ linear_extrude (height = 10) offset (delta = -0.9*bottom_section_width/2) projec
 model_stl=\"$h1_pre_process_OF\";
 model_offset_stl=\"$h3_offset_OF\";
 model_bottom_section_stl=\"$h2_simp_bottom_section_OF\";
-model_offset_section_stl=\"$do_h4_offset_fillet_sect_OF\";
+model_offset_section_stl=\"$h4_offset_fillet_sect_OF\";
 
 bottom_fillet_rad=$bottom_fillet_rad;
 thickness=$thickness;
@@ -737,15 +731,15 @@ orig_zmax=$orig_zmax;
     return $return_code
 }
 
-do_half_bust_FFF() { 
+app_half_bust_FFF() { 
     local return_code
     
     # make an stl version for OpenSCAD processing
-    do_2stl "$1" #this will also run do_metadata, set m_color=NC & perform an admesh check
+    app_2stl "$1" #this will also run do_metadata, set m_color=NC & perform an admesh check
     #do_metadata "$1"
     #m_color="NC"
     
-    half_bust_FFF_IF="$do_2stl_OF"
+    half_bust_FFF_IF="$_2stl_OF"
     #half_bust_FFF_IF="$1"
     half_bust_FFF_OF="${fpref}_half_bust_FFF_neg_vol${meta}.stl"
     
@@ -803,14 +797,14 @@ zmax=$zmax;
 
 # function to put standing figure on a platform
 # Textures are not currently supported since we're using mlx_flatten_layers
-do_platform_FFF() {
+app_platform_FFF() {
     local return_code
     
-    do_2stl "$1" #this will also run do_metadata, set m_color=NC & perform an admesh check
+    app_2stl "$1" #this will also run do_metadata, set m_color=NC & perform an admesh check
     #do_metadata "$1"
     #m_color="NC"
     
-    platform_IF="$do_2stl_OF"
+    platform_IF="$_2stl_OF"
     platform_OF="${fpref}_platform${meta}.stl"
     
     offset=0.001 # small offset from bottom; this amount will overlap between platform & model
@@ -859,16 +853,16 @@ do_platform_FFF() {
     return $return_code
 }
 
-do_scad_template() { 
+app_scad_template() { 
     local return_code
     
     # make an stl version for OpenSCAD processing
-    do_2stl "$1" #this will also run do_metadata, set m_color=NC & perform an admesh check
+    app_2stl "$1" #this will also run do_metadata, set m_color=NC & perform an admesh check
     #do_metadata "$1"
     #m_color="NC"
     
-    #half_bust_FFF_IF="$do_2stl_OF"
-    scad_template_IF="$do_2stl_OF"
+    #half_bust_FFF_IF="$_2stl_OF"
+    scad_template_IF="$_2stl_OF"
     #scad_template_OF="${fpref}_half_bust_FFF_neg_vol${meta}.stl"
     
     ###Measure mesh
