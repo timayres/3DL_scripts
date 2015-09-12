@@ -1,21 +1,22 @@
-//do_h2_to_offset function
+//h2_to_offset function
 
 //variables set via calling script
 
 bottom_open=true;
 
-model_stl="../test_models/TEST_MESH_BUST-simplified25K.-10.Z.NC.S.stl";
-model_bottom_section_stl="../test_models/TEST_MESH_BUST-simplified25K_H1-simpZ0section.-10.Z.NC.S.stl";
+model_stl="../test_models/TEST_BUST-simp20K(-8Z).stl";
+model_bottom_section_stl="../test_models/TEMP3DL_TEST_BUST-simp20K_H2-Zsection(-8Z).dxf";
 
-grow_offset=1;
+grow_offset=0;
 thickness=3;
 
-orig_xmin=-24.343349;
-orig_xmax=24.381460;
-orig_ymin=-16.021044;
-orig_ymax=13.165529;
-orig_zmin=-0.675376;
-orig_zmax=43.144764;
+orig_xmin=-29.564501;
+orig_xmax=31.325228;
+orig_ymin=-20.634674;
+orig_ymax=15.724438;
+orig_zmin=-0.827112;
+orig_zmax=53.902111;
+
 /**********CUT LINE**********/
 // Everything above this line will be replaced by calling script
 // License: LGPLv2.1

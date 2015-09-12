@@ -1,21 +1,23 @@
-//do_h2_to_offset function
+//h2_to_offset function
 
 //variables set via calling script
 
-model_stl="TEMP3DP_Diamond_bust3-BH_BH1-simplified.-4.Z.NC.S.stl";
-model_bottom_section_stl="TEMP3DP_Diamond_bust3-BH_BH1-bottom_section.-4.Z.NC.S.stl";
+model_stl="../test_models/TEST_BUST-simp20K-BH(-4Z).stl";
+model_bottom_section_stl="../test_models/TEMP3DL_TEST_BUST-simp20K-BH_H2-simp_bottom_section(-4Z).stl";
 
 bottom_fillet_rad=1;
 thickness=3;
 BH_angle=10;
-bottom_section_height=6.446277;
+bottom_section_height=2.209493;
+bottom_section_width=31.365492;
 
-orig_xmin=-49.142185;
-orig_xmax=51.308571;
-orig_ymin=-9.593199;
-orig_ymax=56.820095;
-orig_zmin=-49.550304;
-orig_zmax=68.177139;
+orig_xmin=-59.129002;
+orig_xmax=62.650455;
+orig_ymin=-41.269344;
+orig_ymax=31.448877;
+orig_zmin=-51.654224;
+orig_zmax=57.804222;
+
 /**********CUT LINE**********/
 // Everything above this line will be replaced by calling script
 // License: LGPLv2.1

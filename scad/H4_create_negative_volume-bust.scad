@@ -1,17 +1,18 @@
-//do_h3_neg_vol function
+//h4_neg_vol function
 
 //variables set via calling script
 
-model_stl="../test_models/TEST_MESH_BUST-simplified25K_H2-offset.-10.Z.NC.S.stl";
+model_stl="../test_models/TEMP3DL_TEST_BUST-simp20K_H3-offset(-8Z).stl";
+    
+thickness=3;
 
-thickness=-3;
+orig_xmin=-29.564501;
+orig_xmax=31.325228;
+orig_ymin=-20.634674;
+orig_ymax=15.724438;
+orig_zmin=-0.827112;
+orig_zmax=53.902111;
 
-orig_xmin=-24.343935;
-orig_xmax=24.373457;
-orig_ymin=-16.012501;
-orig_ymax=13.160800;
-orig_zmin=-0.672300;
-orig_zmax=43.146698;
 /**********CUT LINE**********/
 // Everything above this line will be replaced by calling script
 // License: LGPLv2.1

@@ -1,26 +1,35 @@
-//do_h4_neg_vol function
+//h4_neg_vol function
 
 //variables set via calling script
 
-model_offset_stl="TEMP3DP_Rashida_magnet_centerx_H3-offset(-8Z).stl";
-model_stl="Rashida_magnet_centerx(-8Z).stl";
-    
-thickness=3;
-magnet_z_pos=9.9930740;
-magnet_center_height=6.144505;
+model_stl="../test_models/TEST_BUST-simp20K(-8Y).stl";
+model_offset_stl="../test_models/TEMP3DL_TEST_BUST-simp20K_H3-offset(-8Y).stl";
 
-orig_xmin=-33.716351;
-orig_xmax=34.678570;
-orig_ymin=-30.723518;
-orig_ymax=13.762821;
-orig_zmin=-8.115490;
-orig_zmax=49.965370;
+thickness=3;
+magnet_z_pos=10.7804222;
+magnet_center_height=6.744958;
+
+orig_xmin=-29.564501;
+orig_xmax=31.325228;
+orig_ymin=-20.634674;
+orig_ymax=15.724438;
+orig_zmin=-0.827112;
+orig_zmax=53.902111;
+
+orig_center_of_mass_x=0.690921;
+orig_center_of_mass_y=-1.400397;
+orig_center_of_mass_z=18.289526;
+
+orig_barycenter_x=0.681426;
+orig_barycenter_y=-1.816130;
+orig_barycenter_z=16.964798;
+
 /**********CUT LINE**********/
 // Everything above this line will be replaced by calling script
 // License: LGPLv2.1
 
-magnet_x_pos=0;//-2.5; // TWEAK THIS to center magnet if needed
-top_slot_x_pos=0;//-2.5; // TWEAK THIS to center top hanging slot if needed
+magnet_x_pos=orig_barycenter_x;//-2.5; // TWEAK THIS to center magnet if needed
+top_slot_x_pos=orig_barycenter_x;//-2.5; // TWEAK THIS to center top hanging slot if needed
 
 //embedded variables
 eps=0.00001; //overlap amount for correct booleans
@@ -95,10 +104,10 @@ rotate ([90,0,0]) {
         translate ([magnet_x_pos,magnet_z_pos,-eps]) cylinder(r=post_r,h=2*body_h,$fn=50); //(+vol) post main body NOTE: had some CGAL errors with this step on Rashida before centering x. Reducing $fn of this cylinder helped, but not if magnet_x_pos was != 0.
         
     //Top hanger
-    translate([0,mag_ymax-thickness-hanger_height,0]) difference() {
+    translate([top_slot_x_pos,mag_ymax-thickness-hanger_height,0]) difference() {
         translate([-mag_xsize/2,0,-eps]) cube([mag_xsize,hanger_height+thickness,thickness+eps]); //(+vol) main body
-        translate([top_slot_x_pos,slot_height,-.1*thickness]) cylinder(d=slot_dia,h=1.2*thickness); //(-vol) top of slot
-        translate([top_slot_x_pos-slot_dia/2,-.1*slot_height,-.1*thickness]) cube([slot_dia,1.1*slot_height,1.2*thickness]); //(-vol) slot
+        translate([0,slot_height,-.1*thickness]) cylinder(d=slot_dia,h=1.2*thickness); //(-vol) top of slot
+        translate([-slot_dia/2,-.1*slot_height,-.1*thickness]) cube([slot_dia,1.1*slot_height,1.2*thickness]); //(-vol) slot
     } //translate
     } //difference
 
@@ -128,7 +137,7 @@ rotate ([90,0,0]) {
     translate ([magnet_x_pos,magnet_z_pos,magnet_center_height]) {
         translate([0,0,-magnet_center_height-(post_r-wall_t)]) cylinder(r=post_r-wall_t,h=magnet_center_height);//(-vol) center hole cylinder
         translate([0,0,-(post_r-wall_t)]) sphere(r=post_r-wall_t);//(-vol) center hole top sphere
-    }
+    } //translate
     //(+vol)
 
 

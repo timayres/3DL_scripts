@@ -1,21 +1,22 @@
-//do_h2_to_offset function
+//h2_to_offset function
 
 //variables set via calling script
 
 bottom_open=true;
 
-model_stl="TEMP3DP_Ethan_bust5_magnet_H1-pre_processed(-6Z).stl";
-model_bottom_section_stl="TEMP3DP_Ethan_bust5_magnet_H2-Zsection(-6Z).dxf";
+model_stl="../test_models/TEST_BUST-simp20K(-8Y).stl";
+model_bottom_section_stl="../test_models/TEMP3DL_TEST_BUST-simp20K_H2-Zsection(-8Y).dxf";
     
 grow_offset=0;
 thickness=3;
 
-orig_xmin=-27.365154;
-orig_xmax=30.706732;
-orig_ymin=-19.909147;
-orig_ymax=13.805316;
-orig_zmin=-10.267079;
-orig_zmax=57.251629;
+orig_xmin=-29.564501;
+orig_xmax=31.325228;
+orig_ymin=-20.634674;
+orig_ymax=15.724438;
+orig_zmin=-0.827112;
+orig_zmax=53.902111;
+
 /**********CUT LINE**********/
 // Everything above this line will be replaced by calling script
 // License: LGPLv2.1
