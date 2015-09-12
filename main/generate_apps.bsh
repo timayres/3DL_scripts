@@ -10,11 +10,11 @@ cd "$scriptpath"
 # compile c programs
 
 if [ ! -x "../c/polylinesort" ] || [ ! -x "../c/polylinesort.exe" ]; then
-    gcc -Wall ../c/polylinesort.c -o ../c/polylinesort
+    gcc -Wall ./c/polylinesort.c -o ./c/polylinesort
 fi
 
 if [ ! -x "../c/AABB" ] || [ ! -x "../c/AABB.exe" ]; then
-    gcc -Wall ../c/AABB.c -o ../c/AABB
+    gcc -Wall ./c/AABB.c -o ./c/AABB
 fi
 
 gen_mlx_scratch_shortcuts="true"
