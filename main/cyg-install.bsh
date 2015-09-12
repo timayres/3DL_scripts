@@ -9,5 +9,5 @@ if [ ! -e /bin/apt-cyg ]; then
 fi
 
 apt-cyg install wget
-apt-cyg install bc zip GraphicsMagick gcc-core dos2unix xmlstarlet
+apt-cyg install bc zip GraphicsMagick cygwin-devel gcc-core dos2unix xmlstarlet
 # apt-cyg install pstoedit potrace poppler autotrace # optional dependencies for 2D
