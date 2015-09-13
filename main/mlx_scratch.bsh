@@ -5,8 +5,8 @@
 
 #set -x
 scriptpath="$(cd "$(dirname "$0")"; pwd -P)"
-verbosity=6
-delete_TEMP3DL_files="true"
+verbosity=2
+delete_TEMP3DL_files="false"
 
 #cd "${scriptpath}/../test_models"
 
@@ -27,7 +27,7 @@ fi
 #do_subfiles "$fbase"
 #measure_AABB "$fbase"
 
-# Generate plane for PLANES.mlp
+# Generate plane for PLANES.mlp; modify if you need a different plane size
 if [  ]; then
     ml_IF=""
     ml_OF="PLANE.obj"
@@ -78,17 +78,21 @@ if [  ]; then
 fi
 
 # test out various functions before adding them to generate_apps.bsh
-if [   ]; then
+if [ 1 ]; then
     #measure_dimension   y=2 $1 z=5
-    #${scriptpath}/../c/polylinesort.bsh test_outline_closed.obj
-    #${scriptpath}/../c/polylinesort.exe polylinesort.test
-    #${scriptpath}/../c/polylinesort.exe test_4_outlines_closed.obj
+    #${scriptpath}/c/polylinesort.bsh test_outline_closed.obj
+    #${scriptpath}/c/polylinesort.exe polylinesort.test
+    #${scriptpath}/c/polylinesort.exe test_4_outlines_closed.obj
+    #${scriptpath}/c/polylinesort.exe polylinesort_square_test.obj
 
     #polylinesort polylinesort_square_test.obj
     #polylinesort polylinesort.test
     #set -x
     #half_bust_FFF "$fbase"
-    measure_geometry "$fbase"
+    #measure_geometry "$fbase"
+    ${scriptpath}/c/AABB.exe "$fbase"
+    
+    measure_AABB "$fbase" >> AABB.txt
 fi
 
 pause

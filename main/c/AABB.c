@@ -72,7 +72,7 @@ int main (int argc, char *argv[])
     {
     fgets(input_line, sizeof(input_line), fp);
     sscanf(input_line, "%f %f %f", (float *)&(V[i].x), (float *)&(V[i].y), (float *)&(V[i].z));
-    printf("%f %f %f \n", V[i].x, V[i].y, V[i].z);
+    //printf("%f %f %f \n", V[i].x, V[i].y, V[i].z);
     if (i == 0)
       {
       minX = maxX = V[0].x;

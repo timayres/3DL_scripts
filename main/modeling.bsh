@@ -642,7 +642,39 @@ orig_ymin=$orig_ymin;
 orig_ymax=$orig_ymax;
 orig_zmin=$orig_zmin;
 orig_zmax=$orig_zmax;
-" > "$h4_neg_vol_scad_OF"        
+" > "$h4_neg_vol_scad_OF"
+            
+            # Set variables for spring post
+            if [ "$m_scale" == "-7" ]; then
+                echo "\
+// inner post and spring guide - 1:7 scale
+// Spring:
+//   Free length = 1 inch
+//   OD = 0.24 inch
+spring_length=25.4; //1 inch
+fn_post=32; //number of segments in post
+post_r=8/2;
+post_h=orig_zmax;
+spring_guide_top_dia=4.5;
+spring_guide_bottom_dia=4;
+spring_guide_height=5;
+    " >> "$h4_neg_vol_scad_OF"
+            else
+                echo "\
+// inner post and spring guide - 1:4 scale
+// Spring:
+//   Free length = 1.5 inch
+//   OD = 0.48 inch
+//   Wire OD = 0.035 inch
+spring_length=40.5; //1.57 inch
+fn_post=32; //number of segments in post
+post_r=14/2;//12.5/2;
+post_h=orig_zmax;
+spring_guide_top_dia=9.5;
+spring_guide_bottom_dia=9;
+spring_guide_height=8;
+    " >> "$h4_neg_vol_scad_OF"
+            fi
             ;;
         4 ) # Create an inset rim around the bottom
             # ask for rim_inset

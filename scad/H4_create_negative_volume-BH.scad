@@ -2,31 +2,43 @@
 
 //variables set via calling script
 
-model_stl="../test_models/TEST_BUST-simp20K-BH(-4Z).stl";
-model_offset_stl="../test_models/TEMP3DL_TEST_BUST-simp20K-BH_H3-offset(-4Z).stl";
-model_bottom_section_stl="../test_models/TEMP3DL_TEST_BUST-simp20K-BH_H2-simp_bottom_section(-4Z).stl";
-model_offset_section_stl="../test_models/TEMP3DL_TEST_BUST-simp20K-BH_H4-offset_section(-4Z).stl";
+model_stl="TEST_BUST-simp20K-BH(-7Z).stl";
+model_offset_stl="TEMP3DL_TEST_BUST-simp20K-BH_H3-offset(-7Z).stl";
+model_bottom_section_stl="TEMP3DL_TEST_BUST-simp20K-BH_H2-simp_bottom_section(-7Z).stl";
+model_offset_section_stl="TEMP3DL_TEST_BUST-simp20K-BH_H4-offset_section(-7Z).stl";
 
 bottom_fillet_rad=1;
 thickness=3;
 BH_angle=10;
-bottom_section_height=2.209493;
-bottom_section_width=31.365492;
+bottom_section_height=1.262567;
+bottom_section_width=17.923137;
 
-m_scale=-4;
-scale=.2500000000;
+m_scale=-7;
+scale=.1428571428;
 
-xcenter=.7527150000;
-ycenter=-5.7633450000;
-center_height=54.478794;
+xcenter=.4301235000;
+ycenter=-3.2933200000;
+center_height=29.816521;
 
-orig_xmin=-59.129002;
-orig_xmax=62.650455;
-orig_ymin=-41.269344;
-orig_ymax=31.448877;
-orig_zmin=-51.654224;
-orig_zmax=57.804222;
+orig_xmin=-33.788002;
+orig_xmax=35.800259;
+orig_ymin=-23.582483;
+orig_ymax=17.970789;
+orig_zmin=-29.516701;
+orig_zmax=33.030987;
 
+// inner post and spring guide - 1:7 scale
+// Spring:
+//   Free length = 1 inch
+//   OD = 0.24 inch
+spring_length=25.4; //1 inch
+fn_post=32; //number of segments in post
+post_r=8/2;
+post_h=orig_zmax;
+spring_guide_top_dia=4.5;
+spring_guide_bottom_dia=4;
+spring_guide_height=5;
+    
 /**********CUT LINE**********/
 // Everything above this line will be replaced by calling script
 
@@ -35,24 +47,6 @@ orig_zmax=57.804222;
 //embedded variables
 eps=0.00001; //overlap amount for correct booleans
 //function pi()=3.14159265358979323846;
-
-//top post for spring
-
-//Spring dimensions:
-// Free length=1.5"
-// OD=0.48"
-// Wire OD=0.035"
-
-// inner post and spring guide - 1:4 scale
-spring_length=40.5; //1.57" Includes bit of bottom post too
-fn_post=32; //number of segments in post
-post_r=14/2;//12.5/2;
-post_h=orig_zmax;
-spring_guide_top_dia=9.5;
-spring_guide_bottom_dia=9;
-spring_guide_height=8;
-
-// inner post and spring guide - 1:7 scale
 
 //Calculations
 orig_xsize=orig_xmax-orig_xmin;
@@ -65,6 +59,9 @@ cut_box_ytrans=(orig_ymin + orig_ymax)/2;
 
 cut_box_zsize= -1.50*orig_zmin;
 cut_box_ztrans=-cut_box_zsize/2;
+
+post_height=spring_length+bottom_section_height;
+chamfer_height= (center_height-post_r > post_height) ? center_height-post_r : spring_length+bottom_section_height;
 
 // Modules & functions
 module bottom_offset_section_2D () {
@@ -98,13 +95,13 @@ rotate ([BH_angle,0,0]) difference() {
 difference() {
     import (file=model_offset_stl, convexity=10);
        
-    translate ([xcenter,ycenter,spring_length+bottom_section_height]) {
+    translate ([xcenter,ycenter,post_height]) {
         cylinder (h=post_h, r=post_r, $fn=fn_post); //main post
         translate ([0,0,-spring_guide_height])cylinder (h=spring_guide_height,d1=spring_guide_bottom_dia, d2=spring_guide_top_dia,$fn=fn_post); //spring guide
         translate ([0,0,-spring_guide_height])sphere(d=spring_guide_bottom_dia,$fn=fn_post); //spring guide bottom
     }
     
     //top chamfer
-    translate ([xcenter,ycenter,center_height-2*post_r]) 
-        cylinder(h=3*post_r,r1=0,r2=3*post_r, $fn=fn_post);
-}
+    translate ([xcenter,ycenter,chamfer_height]) 
+        cylinder(h=2*post_r,r1=post_r,r2=3*post_r, $fn=fn_post);
+} //difference
