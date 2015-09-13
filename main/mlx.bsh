@@ -54,6 +54,10 @@ ml_IF="" #input filename
 ml_OF="" #output filename
 ml_SF="" #filename for .mlx filter script
 ml_LF="" #filename for ML log
+if [ -z "$verbosity" ]; then
+    verbosity=6
+fi
+
 run_meshlab() {
     ##Function to run meshlabserver
     ##Variables (set before calling):
